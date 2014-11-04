@@ -21,20 +21,26 @@ import os
 import gzip
 import json
 import string
-import cjson
 
 
 _tokens = dict()
 _token_ct = 0
 def token(user):
-    ''' Generate a token for a username. The tokens are generated in order, so this is 
+    '''
+    Generate a token for a username. The tokens are generated in order, so this is 
     not generically secure. In this context, they are generate by the order users appear in the 
-    log file. '''
+    log file. 
+
+    Note that this is limited to courses with 140608 users for now (if
+    you go over, it will raise an exception).
+    '''
     global _tokens, _token_ct
     if user in _tokens:
         return _tokens[user]
     t = string.letters [ (_token_ct / (52*52)) % 52]  + string.letters [ (_token_ct / 52) % 52]  + string.letters [ _token_ct % 52]
     _token_ct = _token_ct + 1
+    if _token_ct > 140607:
+        raise "We need to clean up tokenization code to support more users"
     _tokens[user] = t
     return t
 
@@ -42,8 +48,12 @@ def token(user):
 def read_data(directory):
     '''Takes a directory containing log files. Returns an iterator of all
     lines in all files.
+
+    Skip non-.gz files.
     '''
     for f in os.listdir(directory):
+        if not f.endswith(".gz"):
+            continue
         for line in gzip.open(directory+"/"+f):
             yield line
 
@@ -77,7 +87,10 @@ def decode_event(data):
 
 
 def desensitize_data(data, sensitive_fields, sensitive_event_fields):
-    ''' Remove known-sensitive fields.
+    '''Remove known-sensitive fields and replace usernames with tokens.
+
+    This does not fully deidentify data. It is helpful, however, for
+    preventing a range of simple slip-ups in data handling. 
     '''
     for line in data:
         for item in sensitive_fields:
@@ -96,7 +109,7 @@ def desensitize_data(data, sensitive_fields, sensitive_event_fields):
 
 def remove_redundant_data(data):
     '''Some versions of edX would put event data both at the top-level
-    and in context. This cleans this up.
+    and in context. This cleans this up by removing it from context.
     '''
     for line in data:
         if 'context' in line:
@@ -148,3 +161,115 @@ def save_data(data, directory):
         fout.write(line)
         _data_item = _data_item + 1
 
+
+def event_count(data):
+    '''
+    Count number of events in data.
+    '''
+    count = 0
+    for event in data:
+        count = count + 1
+    return count
+
+
+def users_count(data):
+    '''
+    Count number of unique users in data
+    '''
+    return len(field_set(data, "username"))
+
+
+def field_set(data, field):
+    '''
+    Return a set of unique items in field
+    '''
+    us = set()
+    for event in data:
+        us.add(__select_field(event, field))
+    return us
+
+
+def filter_on_events(data, event_types):
+    '''
+    Filter data based on event types
+    '''
+    for d in data:
+        if d['event_type'] in event_types:
+            yield d
+
+
+
+def filter_on_courses(data, courses):
+    '''
+    Filter data based on event types
+    '''
+    for d in data:
+        if 'context' in d and \
+           'course_id' in d['context'] and \
+           d['context']['course_id'] in courses:
+            yield d
+
+
+def filter_on_fields(data, field_spec):
+    '''
+    Filter through fields
+    '''
+    for d in data:  # d is the event
+        valid = True  # Does the event match the spec?
+        for field in field_spec:  # Field we're looking at
+            value = __select_field(d, field)
+            if value not in field_spec[field]:
+                valid = False
+        if valid:
+            yield d
+
+
+def dbic(data, label):
+    '''
+    Debug: Print item count
+    '''
+    cnt = 0
+    for d in data:
+        cnt = cnt + 1
+        yield d
+    print label, cnt
+
+
+def __select_field(event, field):
+    '''
+    Takes a field definition and a dictionary. Does a hierarchical query.
+    __select_field(event, "event:element") is equivalent to: 
+    try:
+      event['event']['element']
+    except KeyError:
+      return None
+    '''
+    for key in field.split(":"):  # Pick out the hierarchy 
+        if key not in event:
+            return None
+        event = event[key]
+    return event
+
+
+def sort_events(data, fields):
+    '''
+    Sort data. Warning: In-memory. Not iterable. Only works for small datasets
+    '''
+    def event_cmp(d1, d2):
+        for field in fields:
+            c = cmp(__select_field(d1, field), __select_field(d2, field))
+            if c != 0:
+                return c
+        return 0
+    return sorted(list(data), cmp = event_cmp)
+
+
+def select_fields(data, fields):
+    '''
+    Filter data down to a subset of fields. Also, flatten (should be a param in the future whether to do this.
+    '''
+    for d in data:
+        d2 = {}
+        for field in fields:
+            d2[field] = __select_field(d, field)
+        yield d2
