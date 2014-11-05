@@ -273,3 +273,17 @@ def select_fields(data, fields):
         for field in fields:
             d2[field] = __select_field(d, field)
         yield d2
+
+
+def select_in(data, string):
+    '''
+    Select data from _text_ (not JSON) where a string appears is in the data
+    '''
+    for d in data:
+        if string in d:
+            yield d
+
+def filter_data(data, filter):
+    for item in data:
+        if filter(item):
+            yield item
