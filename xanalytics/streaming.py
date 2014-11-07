@@ -17,9 +17,10 @@ For best practices.
 
 import argparse
 import dateutil.parser
-import os
 import gzip
 import json
+import numbers
+import os
 import string
 
 
@@ -63,10 +64,10 @@ def filter_map(f, *args):
     Turn a function into an iterator and apply to each item. Pass on
     items which return 'None'
     '''
-    def map_stream(data):
+    def map_stream(data, *fargs):
         for d in data:
             if d is not None:
-                yield f(d, *args)
+                yield f(d, *(args+fargs))
     return map_stream
 
 
@@ -314,22 +315,31 @@ def filter_data(data, filter):
             yield item
 
 
-def truncate_json(data_item, max_length):
+def truncate_json(data, max_length):
+    for d in data:
+        t = _truncate_json(d, max_length)
+        yield t
+
+
+def _truncate_json(data_item, max_length):
     '''
     Truncate strings longer than max_length in a JSON object. Long
     strings are replaced with 'none'
     '''
     if isinstance(data_item, dict):
         for key in data_item:
-            data_item[key] = truncate_json(data_item[key], max_length)
+            data_item[key] = _truncate_json(data_item[key], max_length)
         return data_item
-    elif isinstance(data_item, numbers.Integral):
+    elif isinstance(data_item, numbers.Number):
         return data_item
     elif isinstance(data_item, basestring):
         if len(data_item)>max_length:
             return None
         return data_item
     elif isinstance(data_item, list):
-        return map(lambda x:truncate_json(x, max_length), data_item)
+        return list(map(lambda x:_truncate_json(x, max_length), data_item))
+    elif data_item is None:
+        return data_item
     else:
+        print data_item
         raise AttributeError

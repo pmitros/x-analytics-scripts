@@ -102,16 +102,3 @@ if __name__ == '__main__':
     data= list(data)
     print len(data)
     print data
-
-
-# def f(qin,qout):
-#     qout.put([42, None, 'hello'])
-
-# 
-#     qin = Queue()
-#     qout = Queue()
-#     qin.
-#     p = Process(target=f, args=(qin, qout,))
-#     p.start()
-#     print qout.get()    # prints "[42, None, 'hello']"
-#     p.join()
