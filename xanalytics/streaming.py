@@ -58,19 +58,36 @@ def read_data(directory):
             yield line
 
 
-def text_to_json(data):
+def filter_map(f, *args):
+    '''
+    Turn a function into an iterator and apply to each item. Pass on
+    items which return 'None'
+    '''
+    def map_stream(data):
+        for d in data:
+            if d is not None:
+                yield f(d, *args)
+    return map_stream
+
+
+@filter_map
+def text_to_json(line):
     ''' Decode lines to JSON. If a line is truncated, this will drop the line. 
     '''
-    for line in data:
-        line = line.strip()
-        if len(line) in range(32000, 33000):
-            continue
-        try:
-            line = json.loads(line)
-            yield line
-        except ValueError:
-            print line, len(line)
-            raise
+    line = line.strip()
+    if len(line) in range(32000, 33000):
+        return None
+    try:
+        line = json.loads(line)
+        return line
+    except ValueError:
+        print line, len(line)
+        raise
+
+
+if __name__ == '__main__':
+    data = ("""["a","b"]""","""["c","d"]""",)
+    print list(text_to_json(data)) == [[u'a', u'b'], [u'c', u'd']]
 
 
 def decode_event(data):

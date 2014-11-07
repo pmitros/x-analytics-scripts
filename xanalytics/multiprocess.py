@@ -13,9 +13,19 @@ accumulations as a split()/accumulate/join()/accumulate.
 from multiprocessing import Queue
 import os, sys, itertools, time
 
+import sentinel
+
 _pid = None
 _qout = Queue(maxsize = 1000)
 _processes = 0
+
+EndOfQueue = "End of queue"
+FeederThread = sentinel.create('FeederThread')
+ConsumerThread = sentinel.create('ConsumerThread')
+
+def log(task, item):
+    if False:
+        print "[{pid}] [{task}]: {item}".format(pid = _pid, task = task, item = item)
 
 def split(data, processes):
     '''
@@ -32,32 +42,52 @@ def split(data, processes):
             process = os.fork()
             if process != 0:
                 return i
-        return i+1
+        if os.fork() == 0:
+            return FeederThread
+        else:
+            return ConsumerThread
 
     qin = Queue(maxsize=1000)
 
     _pid = forker()
-    #print pid
+    #print "pid", _pid
 
     ## Feeder process
-    if _pid == processes:
+    if _pid == FeederThread:
         for d in data:
-            qin.put(d)
+            qin.put(d, block=True)
         for d in range(processes):
-            qin.put(None)
+            qin.put(EndOfQueue, block=True)
+        qin.close()
+        qin.join_thread()
+        return []
+    elif _pid == ConsumerThread:
         return []
     else:
-        return iter(lambda : qin.get(), None)
+        return iter(lambda : qin.get(block=True), EndOfQueue)
 
 def join(data):
-    if _pid != 0:
-        for d in data:
-            _qout.put(d)
-        _qout.put(None)
-        sys.exit(0)
-    
-    iterables = [iter(lambda:_qout.get(), None) for x in range(_processes)]
-    return itertools.chain(*iterables)
+    def pull_data():
+        #print "Attempting PULL"
+        d = _qout.get(block=True)
+        log("PULL", d)
+        return d
+
+    if _pid == ConsumerThread:
+        #print "Iterables"
+        iterables = [iter(pull_data, EndOfQueue) for x in range(_processes+1)]
+        #print "Done iterables"
+        return itertools.chain(*iterables)
+
+    for d in data:
+        log("PUT", d)
+        _qout.put(d, block=True)
+    log("PUT", "EOQ")
+    _qout.put(EndOfQueue, block=True)
+    _qout.close()
+    _qout.join_thread()
+    os._exit(0)
+    return []
 
 if __name__ == '__main__':
     data = split(range(100), 8)
@@ -65,12 +95,13 @@ if __name__ == '__main__':
     def compute(data):
         for d in data:
             time.sleep(1)
-            yield d
+            yield d/2.
 
     data = compute(data)
     data = join(data)
-    print list(data)
-
+    data= list(data)
+    print len(data)
+    print data
 
 
 # def f(qin,qout):
