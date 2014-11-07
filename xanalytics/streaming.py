@@ -213,6 +213,10 @@ def filter_on_courses(data, courses):
 def filter_on_fields(data, field_spec):
     '''
     Filter through fields
+    
+    field_spec maps field names to lists of possible values. For example:
+    {'username':['jack','jill']
+    Will return all of the data where the user is either Jack or Jill
     '''
     for d in data:  # d is the event
         valid = True  # Does the event match the spec?
@@ -283,7 +287,32 @@ def select_in(data, string):
         if string in d:
             yield d
 
+
 def filter_data(data, filter):
+    '''
+    Apply a function 'filter' to all elements in the data
+    '''
     for item in data:
         if filter(item):
             yield item
+
+
+def truncate_json(data_item, max_length):
+    '''
+    Truncate strings longer than max_length in a JSON object. Long
+    strings are replaced with 'none'
+    '''
+    if isinstance(data_item, dict):
+        for key in data_item:
+            data_item[key] = truncate_json(data_item[key], max_length)
+        return data_item
+    elif isinstance(data_item, numbers.Integral):
+        return data_item
+    elif isinstance(data_item, basestring):
+        if len(data_item)>max_length:
+            return None
+        return data_item
+    elif isinstance(data_item, list):
+        return map(lambda x:truncate_json(x, max_length), data_item)
+    else:
+        raise AttributeError
