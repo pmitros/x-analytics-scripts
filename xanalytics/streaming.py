@@ -22,7 +22,9 @@ import json
 import numbers
 import os
 import string
+import struct
 
+from bson import BSON
 
 _tokens = dict()
 _token_ct = 0
@@ -341,5 +343,51 @@ def _truncate_json(data_item, max_length):
     elif data_item is None:
         return data_item
     else:
-        print data_item
         raise AttributeError
+
+
+def memoize(data, directory):
+    '''
+    UNTESTED/UNTESTED/UNTESTED
+
+    Check if the directory already has data. If so, read it in. Otherwise, dump 
+    data to the directory and return it. 
+
+    The current version reads/writes redundantly on the save operation, and 
+    JSON decodes redundantly, so it's not very performant. This would be worth
+    fixing. 
+
+    UNTESTED/UNTESTED/UNTESTED
+    '''
+    for f in os.listdir(directory):
+        if not f.endswith(".gz"):
+            continue
+        return read_data(directory)
+
+    save_data(data, directory)
+    return read_data(directory)
+
+
+def read_bson_file(filename):
+    '''
+    Reads a dump of BSON to a file.
+
+    Reading BSON is 3-4 times faster than reading JSON.
+    '''
+    with gzip.open(filename, "rb") as f:
+        while True:
+            l = f.read(4)
+            if len(l)<4:
+                break
+            length = struct.unpack('<i', l)
+            o = l + f.read(length[0]-4)
+            yield BSON.decode(BSON(o))
+
+
+def encode_to_bson(data):
+    '''
+    Encode to BSON. Encoding BSON is about the same speed as encoding
+    JSON (~25% faster), but decoding is much faster. 
+    '''
+    for d in data:
+        yield BSON.encode(d)
