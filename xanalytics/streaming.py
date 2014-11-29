@@ -18,13 +18,24 @@ For best practices.
 import argparse
 import dateutil.parser
 import gzip
-import json
+try:
+    import json
+except:
+    try:
+        import simplejson as json
+    except:
+        os.system("pip install simplejson")
+        import simplejson as json
 import numbers
 import os
 import string
 import struct
 
-from bson import BSON
+try:
+    from bson import BSON
+except:
+    os.system("pip install pymongo")
+    from bson import BSON
 
 _tokens = dict()
 _token_ct = 0
@@ -48,17 +59,24 @@ def token(user):
     return t
 
 
-def read_data(directory):
-    '''Takes a directory containing log files. Returns an iterator of all
+def get_files(filesystem):
+    for f in sorted(os.listdir(directory)):
+        if not f.endswith(".gz"):
+            continue
+        yield f
+
+
+def read_data(filesystem, directory = ".", only_gz = False):
+    '''Takes a pyfs containing log files. Returns an iterator of all
     lines in all files.
 
     Skip non-.gz files.
     '''
-    for f in os.listdir(directory):
-        if not f.endswith(".gz"):
+    for f in filesystem.listdir(directory):
+        if only_gz and not f.endswith(".gz"):
             continue
-        for line in gzip.open(directory+"/"+f):
-            yield line
+        for line in filesystem.open(directory+"/"+f):
+            yield line.encode('ascii', 'ignore')
 
 
 def filter_map(f, *args):
@@ -69,7 +87,9 @@ def filter_map(f, *args):
     def map_stream(data, *fargs):
         for d in data:
             if d is not None:
-                yield f(d, *(args+fargs))
+                o = f(d, *(args+fargs))
+                if o:
+                    yield o 
     return map_stream
 
 
@@ -85,7 +105,8 @@ def text_to_json(line):
         return line
     except ValueError:
         print line, len(line)
-        raise
+        return None
+        #raise
 
 
 if __name__ == '__main__':

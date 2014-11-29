@@ -66,7 +66,7 @@ for row in data:
     rownum = rownum + 1
 
 if __name__ == '__main__':
-    # Test case: print countries with per-capita GDP under $3000
+    # Test case: extract countries with per-capita GDP under $3000
     countries = []
 
     for row in c.execute('SELECT Internet_country_code, Languages from cia where GDP_per_capita_PPP < 3000'):
