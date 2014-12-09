@@ -35,8 +35,8 @@ import os
 import gzip
 import json
 import string
-import cjson
 import fs.osfs
+from xanalytics.gzipfs import GZIPFS
 
 from streaming import *
 
@@ -51,10 +51,10 @@ args = parser.parse_args()
 print "Reading from ", args.input
 print "Writing to ", args.output
 
-in = fs.osfs.OSFS(input)
-out = fs.osfs.OSFS(output)
+infs = GZIPFS(args.input)
+outfs = GZIPFS(args.output)
 
-data = read_data(in, format=args.informat)
+data = read_data(infs, format=args.informat)
 if args.mindate:
     data = date_gt_filter(data, args.mindate)
 data = decode_event(data)
@@ -63,4 +63,4 @@ data = desensitize_data(data,
                         ['agent', 'ip', 'host', 'user_id', "session"], 
                         ["csrfmiddlewaretoken", "session"])
 data = json_to_text(data)
-save_data(data, args.output, format=args.outformat)
+save_data(data, args.output) # TODO:, format=args.outformat)

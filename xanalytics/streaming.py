@@ -192,9 +192,9 @@ def remove_redundant_data(data):
                 if item in line and line[item] == line['context'][item]:
                     del line['context'][item]
         for item in ['course_user_tags']:
-            if item in list(line['context']):
+            if 'context' in line and item in list(line['context']):
                 del line['context'][item]
-        if len(line['context']) == 0:
+        if 'context' in line and len(line['context']) == 0:
             del line['context']
         yield line
 
