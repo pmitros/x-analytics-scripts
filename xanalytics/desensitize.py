@@ -36,6 +36,7 @@ import gzip
 import json
 import string
 import cjson
+import fs.osfs
 
 from streaming import *
 
@@ -43,16 +44,23 @@ parser = argparse.ArgumentParser(description='Desensitize (but not anonymize) an
 parser.add_argument("input", help="Input directory")
 parser.add_argument("output", help="Output directory")
 parser.add_argument("--mindate", help="Date cutoff", default=None)
+parser.add_argument("--informat", help="input format (JSON or BSON)", default="json")
+parser.add_argument("--outformat", help="output format (JSON or BSON)", default="bson")
 args = parser.parse_args()
 
 print "Reading from ", args.input
-data = read_data(args.input)
 print "Writing to ", args.output
-data = text_to_json(data)
+
+in = fs.osfs.OSFS(input)
+out = fs.osfs.OSFS(output)
+
+data = read_data(in, format=args.informat)
 if args.mindate:
     data = date_gt_filter(data, args.mindate)
 data = decode_event(data)
 data = remove_redundant_data(data)
-data = desensitize_data(data, ['agent', 'ip', 'host', 'user_id', "session"], ["csrfmiddlewaretoken", "session"])
+data = desensitize_data(data, 
+                        ['agent', 'ip', 'host', 'user_id', "session"], 
+                        ["csrfmiddlewaretoken", "session"])
 data = json_to_text(data)
-save_data(data, args.output)
+save_data(data, args.output, format=args.outformat)
