@@ -123,6 +123,20 @@ def _read_text_data(filesystem, directory = ".", only_gz = False):
             yield line.encode('ascii', 'ignore')
 
 
+@filter_map
+def text_to_csv(line, csv_delimiter="\t", csv_header = False):
+    '''
+    Untested
+    '''
+    if csv_header:
+        # TODO
+        raise UnimplementedException("CSVs with headers don't work yet. Sorry. This is kind of a major hole.")
+    else:
+        if line[-1] == '\n':
+            line = line[:-1]
+        return line.split(csv_delimiter)
+
+
 def read_data(filesystem, directory = ".", only_gz = False, format="text", csv_delimiter="\t", csv_header = False):
     '''Takes a pyfs containing log files. Returns an iterator of all
     lines in all files.
@@ -137,7 +151,7 @@ def read_data(filesystem, directory = ".", only_gz = False, format="text", csv_d
     elif format == "bson":
         raise UnimplementedException("BSON reading doesn't work in this path yet. Sorry. This is kind of a major hole.")
     elif format == "csv":
-        raise UnimplementedException("Reading CSV doesn't work in this path yet. Sorry. This is kind of a major hole.")
+        return text_to_csv(_read_text_data(filesystem, directory, only_gz), csv_delimiter, csv_header)
     else: 
         raise AttributeError("Unknown format: ", format)
 
@@ -157,12 +171,37 @@ def filter_map(f, *args):
 
 
 @filter_map
-def text_to_json(line):
-    ''' Decode lines to JSON. If a line is truncated, this will drop the line. 
+def text_to_json(line, clever=True):
+    '''Decode lines to JSON. If a line is truncated, this will drop the line. 
+    
+    clever allows us to try to reconstruct long lines. This is not
+    helpful for most analytics, but sometimes, it is. 
     '''
     line = line.strip()
+    if clever:
+        if "{" not in line:
+            return None
+        endings = ['', '}', '"}', '""}', '"}}', '"}}}', '"}}}}', '"}}}}}', '"}}}}}}']
+        for ending in endings: 
+            try:
+                line = json.loads(line+ending)
+                return line
+            except:
+                pass
+        print line
+        print "Warning: We've got a line we couldn't fix up. Please look at it, and add the right logic to streaming.py."
+        print "It's usually a new ending. Sometimes, it's detecting a non-JSON line of some form"
+        os.exit(-1)
+
+    # We've truncated lines to random lengths in the past... 
     if len(line) in range(32000, 33000):
         return None
+    elif len(line) in range(9980,10001):
+        return None
+    elif len(line) in range(2039, 2044):
+        return None
+    elif line[0] != "{":
+        return
     try:
         line = json.loads(line)
         return line

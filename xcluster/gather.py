@@ -6,6 +6,8 @@ import boto.sqs
 import xanalytics.settings
 from boto.sqs.message import Message
 from boto.s3.connection import S3Connection
+import md5
+import os, os.path
 
 s3_conn = S3Connection(aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'], aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
 bucket = s3_conn.get_bucket(xanalytics.settings.settings["scratch-bucket"])
@@ -16,5 +18,10 @@ print "Total size", sum(i.size for i in l)
 
 i=0
 for key in l:
-     key.get_contents_to_filename(str(i))
-     i = i+1
+    filename = md5.new()
+    filename.update(key.name)
+    filename = "out/"+filename.hexdigest()
+    if not os.path.exists(filename):
+        key.get_contents_to_filename(filename)
+    i = i+1
+    print i
