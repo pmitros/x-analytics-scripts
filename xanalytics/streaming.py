@@ -33,6 +33,8 @@ import struct
 
 from fs.base import FS
 
+import fs.osfs
+
 #try:
 from bson import BSON
 #except:
@@ -61,32 +63,59 @@ def token(user):
     return t
 
 
-def get_files(filesystem, only_gz = False):
+if __name__=="__main__":
+    names = map(str, range(100))
+    tokenized_once = map(token, names)
+    tokenized_twice = map(token, names)
+    # Confirm we have the same mapping if we pass a name through twice
+    print tokenized_once == tokenized_twice
+    # Confirm we have a different mapping for different users
+    print len(set(tokenized_once)) == len(tokenized_once)
+
+
+def _to_filesystem(filesystem_or_directory):
     '''
-    Return an iterator of all the files in a given directory or pyfilesystem. 
-    
+    Take a pyfilesystem or directory. 
+
+    If a directory, return a pyfilesystem. 
+
+    This gives backwards-compatibility with code before we moved to pyfs
     '''
-    if isinstance(filesystem, FS):
-        for f in sorted(filesystem.listdir()):
-            if only_gz and not f.endswith(".gz"):
-                continue
-            yield f
-    elif isinstance(filesystem, basestring):        
-        warnings.warn("You're probably doing something deprecated...")
-        for f in sorted(os.listdir(filesystem)):
-            if only_gz and not f.endswith(".gz"):
-                continue
-            yield f
+    if isinstance(filesystem_or_directory, FS):
+        return filesystem_or_directory
+    elif isinstance(filesystem_or_directory, basestring):
+        warnings.warn("Warning: We're deprecating directory support in favor of pyfs.")
+        return fs.osfs.OSFS(filesystem_or_directory)
     else:
         raise AttributeError("Unrecognized parameter for filesystem argument: "+repr(filesystem))
 
+
+def get_files(filesystem, directory = ".", only_gz = False):
+    '''
+    Return an iterator of all the files in a given directory or pyfilesystem.     
+    '''
+    filesystem = _to_filesystem(filesystem)
+    for f in sorted(filesystem.listdir(directory)):
+        if only_gz and not f.endswith(".gz"):
+            continue
+        yield f
+
+
 if __name__=="__main__":
+    # Confirm we can list the current directory, either as a string, or as a pyfilesystem
     print "__init__.py" in list(get_files("."))
     import fs.osfs
     print "__init__.py" in list(get_files(fs.osfs.OSFS(".")))
 
 
 def _read_text_data(filesystem, directory = ".", only_gz = False):
+    '''
+    Helper: Yield all the lines in all the files in a directory.
+
+    The only_gz helps with edX directories which contain a mixture of useful and useless files.
+    '''
+    filesystem = _to_filesystem(filesystem)
+
     for f in filesystem.listdir(directory):
         if only_gz and not f.endswith(".gz"):
             continue
@@ -94,7 +123,7 @@ def _read_text_data(filesystem, directory = ".", only_gz = False):
             yield line.encode('ascii', 'ignore')
 
 
-def read_data(filesystem, directory = ".", only_gz = False, format="text"):
+def read_data(filesystem, directory = ".", only_gz = False, format="text", csv_delimiter="\t", csv_header = False):
     '''Takes a pyfs containing log files. Returns an iterator of all
     lines in all files.
 
