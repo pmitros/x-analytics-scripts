@@ -1,6 +1,8 @@
 import os.path
 import yaml
 
+import fs.osfs
+
 from xanalytics.gzipfs import GZIPFS
 
 settings_files = ['/etc/xanalytics', '~/.xanalytics']
@@ -26,7 +28,7 @@ settings = _settings()
 settings.refresh()
 
 
-def _fslookup(namespace, directory):
+def _fslookup(namespace, directory, compress):
     basepath = settings[directory]
     if namespace:
         path = os.path.join(basepath, namespace)
@@ -34,21 +36,24 @@ def _fslookup(namespace, directory):
             os.mkdir(path)
     else:
         path = basepath
+    
+    if compress:
+        return GZIPFS(path)
+    else:
+        return fs.osfs.OSFS(path)
 
-    return GZIPFS(path)
 
+def outputfs(namespace = False, compress=True):
+    return _fslookup(namespace, 'output-dir', compress)
 
-def outputfs(namespace = False):
-    return _fslookup(namespace, 'output-dir')
+def scratchfs(namespace = False, compress=True):
+    return _fslookup(namespace, 'scratch-dir', compress)
 
-def scratchfs(namespace = False):
-    return _fslookup(namespace, 'scratch-dir')
+def publicdatafs(namespace = False, compress=True):
+    return _fslookup(namespace, 'public-data-dir', compress)
 
-def publicdatafs(namespace = False):
-    return _fslookup(namespace, 'public-data-dir')
-
-def edxdatafs(namespace = False):
-    return _fslookup(namespace, 'edx-data-dir')
+def edxdatafs(namespace = False, compress=True):
+    return _fslookup(namespace, 'edx-data-dir', compress)
 
 
 
