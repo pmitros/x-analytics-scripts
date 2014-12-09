@@ -14,7 +14,7 @@ See:
 For best practices.
 '''
 
-
+import warnings
 import argparse
 import dateutil.parser
 import gzip
@@ -31,11 +31,13 @@ import os
 import string
 import struct
 
-try:
-    from bson import BSON
-except:
-    os.system("pip install pymongo")
-    from bson import BSON
+from fs.base import FS
+
+#try:
+from bson import BSON
+#except:
+#    os.system("pip install pymongo")
+#    from bson import BSON
 
 _tokens = dict()
 _token_ct = 0
@@ -59,24 +61,56 @@ def token(user):
     return t
 
 
-def get_files(filesystem):
-    for f in sorted(os.listdir(directory)):
-        if not f.endswith(".gz"):
-            continue
-        yield f
-
-
-def read_data(filesystem, directory = ".", only_gz = False):
-    '''Takes a pyfs containing log files. Returns an iterator of all
-    lines in all files.
-
-    Skip non-.gz files.
+def get_files(filesystem, only_gz = False):
     '''
+    Return an iterator of all the files in a given directory or pyfilesystem. 
+    
+    '''
+    if isinstance(filesystem, FS):
+        for f in sorted(filesystem.listdir()):
+            if only_gz and not f.endswith(".gz"):
+                continue
+            yield f
+    elif isinstance(filesystem, basestring):        
+        warnings.warn("You're probably doing something deprecated...")
+        for f in sorted(os.listdir(filesystem)):
+            if only_gz and not f.endswith(".gz"):
+                continue
+            yield f
+    else:
+        raise AttributeError("Unrecognized parameter for filesystem argument: "+repr(filesystem))
+
+if __name__=="__main__":
+    print "__init__.py" in list(get_files("."))
+    import fs.osfs
+    print "__init__.py" in list(get_files(fs.osfs.OSFS(".")))
+
+
+def _read_text_data(filesystem, directory = ".", only_gz = False):
     for f in filesystem.listdir(directory):
         if only_gz and not f.endswith(".gz"):
             continue
         for line in filesystem.open(directory+"/"+f):
             yield line.encode('ascii', 'ignore')
+
+
+def read_data(filesystem, directory = ".", only_gz = False, format="text"):
+    '''Takes a pyfs containing log files. Returns an iterator of all
+    lines in all files.
+
+    Optional: Skip non-.gz files.
+    Optional: Format can be text, JSON, or BSON, in which case, we'll decode. 
+    '''
+    if format == "text":
+        return _read_text_data(filesystem, directory, only_gz)
+    elif format == "json":
+        return text_to_json(_read_text_data(filesystem, directory, only_gz))
+    elif format == "bson":
+        raise UnimplementedException("BSON reading doesn't work in this path yet. Sorry. This is kind of a major hole.")
+    elif format == "csv":
+        raise UnimplementedException("Reading CSV doesn't work in this path yet. Sorry. This is kind of a major hole.")
+    else: 
+        raise AttributeError("Unknown format: ", format)
 
 
 def filter_map(f, *args):
