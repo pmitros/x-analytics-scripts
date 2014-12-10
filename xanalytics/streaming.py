@@ -41,6 +41,20 @@ from bson import BSON
 #    os.system("pip install pymongo")
 #    from bson import BSON
 
+def filter_map(f, *args):
+    '''
+    Turn a function into an iterator and apply to each item. Pass on
+    items which return 'None'
+    '''
+    def map_stream(data, *fargs):
+        for d in data:
+            if d is not None:
+                o = f(d, *(args+fargs))
+                if o:
+                    yield o 
+    return map_stream
+
+
 _tokens = dict()
 _token_ct = 0
 def token(user):
@@ -123,6 +137,12 @@ def _read_text_data(filesystem, directory = ".", only_gz = False):
             yield line.encode('ascii', 'ignore')
 
 
+def _read_bson_data(filesystem, directory):
+    for f in get_files(filesystem, directory, only_gz):
+        for line in _read_bson_file(filesystem.open(os.path.join(directory, f))):
+            yield line
+
+
 @filter_map
 def text_to_csv(line, csv_delimiter="\t", csv_header = False):
     '''
@@ -144,30 +164,18 @@ def read_data(filesystem, directory = ".", only_gz = False, format="text", csv_d
     Optional: Skip non-.gz files.
     Optional: Format can be text, JSON, or BSON, in which case, we'll decode. 
     '''
+    filesystem = _to_filesystem(filesystem)
     if format == "text":
         return _read_text_data(filesystem, directory, only_gz)
     elif format == "json":
         return text_to_json(_read_text_data(filesystem, directory, only_gz))
     elif format == "bson":
-        raise UnimplementedException("BSON reading doesn't work in this path yet. Sorry. This is kind of a major hole.")
+        warnings.warn("Untested code path")
+        return _read_bson_data(filesystem, directory)
     elif format == "csv":
         return text_to_csv(_read_text_data(filesystem, directory, only_gz), csv_delimiter, csv_header)
     else: 
         raise AttributeError("Unknown format: ", format)
-
-
-def filter_map(f, *args):
-    '''
-    Turn a function into an iterator and apply to each item. Pass on
-    items which return 'None'
-    '''
-    def map_stream(data, *fargs):
-        for d in data:
-            if d is not None:
-                o = f(d, *(args+fargs))
-                if o:
-                    yield o 
-    return map_stream
 
 
 @filter_map
@@ -202,7 +210,7 @@ def text_to_json(line, clever=False):
         return None
     elif len(line) in range(2039, 2044):
         return None
-    elif line[0] != "{":
+    elif line[0] not in ['{']: # Tracking logs are always dicts
         return
     try:
         line = json.loads(line)
@@ -214,8 +222,8 @@ def text_to_json(line, clever=False):
 
 
 if __name__ == '__main__':
-    data = ("""["a","b"]""","""["c","d"]""",)
-    print list(text_to_json(data)) == [[u'a', u'b'], [u'c', u'd']]
+    data = ("""{"a":"b"}""","""["c","d"]""",)
+    print list(text_to_json(data)) == [{u'a': u'b'}]
 
 
 def decode_event(data):
@@ -493,20 +501,29 @@ def memoize(data, directory):
     return read_data(directory)
 
 
+def _read_bson_file(fp):
+    while True:
+        l = f.read(4)
+        if len(l)<4:
+            break
+        length = struct.unpack('<i', l)
+        o = l + f.read(length[0]-4)
+        yield BSON.decode(BSON(o))
+
+
 def read_bson_file(filename):
     '''
     Reads a dump of BSON to a file.
 
-    Reading BSON is 3-4 times faster than reading JSON.
+    Reading BSON is 3-4 times faster than reading JSON with:
+      import json
+
+    Performance between cjson, simplejson, and other libraries is more
+    mixed.
+
+    Untested since move from filename to fp and refactoring
     '''
-    with gzip.open(filename, "rb") as f:
-        while True:
-            l = f.read(4)
-            if len(l)<4:
-                break
-            length = struct.unpack('<i', l)
-            o = l + f.read(length[0]-4)
-            yield BSON.decode(BSON(o))
+    return _read_bson_file(gzip.open(filename))
 
 
 def encode_to_bson(data):
