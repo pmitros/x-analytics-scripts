@@ -171,11 +171,13 @@ def filter_map(f, *args):
 
 
 @filter_map
-def text_to_json(line, clever=True):
+def text_to_json(line, clever=False):
     '''Decode lines to JSON. If a line is truncated, this will drop the line. 
     
     clever allows us to try to reconstruct long lines. This is not
-    helpful for most analytics, but sometimes, it is. 
+    helpful for most analytics due to performance, but it is in cases
+    where we need every last bit of data.
+
     '''
     line = line.strip()
     if clever:
