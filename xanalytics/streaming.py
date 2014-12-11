@@ -188,9 +188,14 @@ def text_to_json(line, clever=False):
 
     '''
     line = line.strip()
+    if "{" not in line:
+        return None
+    if len(line) == 0:
+        return None
+    if line[0] not in ['{']: # Tracking logs are always dicts
+        return None
+
     if clever:
-        if "{" not in line:
-            return None
         endings = ['', '}', '"}', '""}', '"}}', '"}}}', '"}}}}', '"}}}}}', '"}}}}}}']
         for ending in endings: 
             try:
@@ -210,8 +215,6 @@ def text_to_json(line, clever=False):
         return None
     elif len(line) in range(2039, 2044):
         return None
-    elif line[0] not in ['{']: # Tracking logs are always dicts
-        return
     try:
         line = json.loads(line)
         return line
