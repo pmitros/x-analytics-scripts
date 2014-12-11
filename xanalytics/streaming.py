@@ -538,7 +538,7 @@ def encode_to_bson(data):
 import md5
 
 _hash_memory = dict()
-def hash(string, length=3, memoize = False):
+def short_hash(string, length=3, memoize = False):
     '''
     Provide a compact hash of a string. Returns a hex string which is
     the hash. length is the length of the string. 
