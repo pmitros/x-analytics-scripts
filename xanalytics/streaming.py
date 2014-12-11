@@ -533,3 +533,33 @@ def encode_to_bson(data):
     '''
     for d in data:
         yield BSON.encode(d)
+
+
+import md5
+
+_hash_memory = dict()
+def hash(string, length=3, memoize = False):
+    '''
+    Provide a compact hash of a string. Returns a hex string which is
+    the hash. length is the length of the string. 
+
+    This is helpful if we want to shard data.
+    '''
+    global _hash_memory
+    if memoize:
+        if string in _hash_memory: 
+            return _hash_memory[string]
+    m = md5.new()
+    m.update(string)
+    h = m.hexdigest()[0:length]
+    if memoize:
+        _hash_memory[string] = h
+    return h
+
+if __name__=='__main__':
+    print hash("Alice") != hash("Bob")
+    print hash("Eve") == hash("Eve")
+    print "Alice" not in _hash_memory
+    print hash("Eve", memoize=True) == hash("Eve", memoize=True)
+    print "Eve" in _hash_memory
+    print len(hash("Mallet")) == 3
