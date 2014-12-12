@@ -14,31 +14,33 @@ See:
 For best practices.
 '''
 
-import warnings
 import argparse
 import dateutil.parser
 import gzip
-try:
-    import simplejson as json
-except:
-    import json
-#    except:
-#        os.system("pip install simplejson")
-#        import simplejson as json
+import md5
 import numbers
 import os
 import string
 import struct
+import warnings
+
+try:
+    import simplejson as json
+except:
+    import json
+
 
 from fs.base import FS
 
 import fs.osfs
 
-#try:
-from bson import BSON
-#except:
-#    os.system("pip install pymongo")
-#    from bson import BSON
+from bson import BSON  #  from pymongo in pip
+
+
+######
+## Generic functions to stream processing in Python
+######
+
 
 def filter_map(f, *args):
     '''
@@ -52,38 +54,6 @@ def filter_map(f, *args):
                 if o:
                     yield o 
     return map_stream
-
-
-_tokens = dict()
-_token_ct = 0
-def token(user):
-    '''
-    Generate a token for a username. The tokens are generated in order, so this is 
-    not generically secure. In this context, they are generate by the order users appear in the 
-    log file. 
-
-    Note that this is limited to courses with 140608 users for now (if
-    you go over, it will raise an exception).
-    '''
-    global _tokens, _token_ct
-    if user in _tokens:
-        return _tokens[user]
-    t = string.letters [ (_token_ct / (52*52)) % 52]  + string.letters [ (_token_ct / 52) % 52]  + string.letters [ _token_ct % 52]
-    _token_ct = _token_ct + 1
-    if _token_ct > 140607:
-        raise "We need to clean up tokenization code to support more users"
-    _tokens[user] = t
-    return t
-
-
-if __name__=="__main__":
-    names = map(str, range(100))
-    tokenized_once = map(token, names)
-    tokenized_twice = map(token, names)
-    # Confirm we have the same mapping if we pass a name through twice
-    print tokenized_once == tokenized_twice
-    # Confirm we have a different mapping for different users
-    print len(set(tokenized_once)) == len(tokenized_once)
 
 
 def _to_filesystem(filesystem_or_directory):
@@ -228,6 +198,142 @@ if __name__ == '__main__':
     print list(text_to_json(data)) == [{u'a': u'b'}]
 
 
+def json_to_text(data):
+    ''' Convert JSON back to text, for dumping to processed file
+    '''
+    for line in data:
+        yield json.dumps(line)+'\n'
+
+
+_data_part = 0
+_data_item = 0
+def save_data(data, directory):
+    '''Write data back to the directory specified. Data is dumped into
+    individual files, each a maximum of 20,000 events long. 
+    '''
+    global _data_part, _data_item
+    fout = None
+    for line in data:
+        if _data_item % 20000 == 0:
+            if fout:
+                fout.close()
+            fout = gzip.open(directory+'/part'+str(_data_part)+".gz", "w")
+            _data_part = _data_part + 1
+        fout.write(line)
+        _data_item = _data_item + 1
+
+
+def read_bson_file(filename):
+    '''
+    Reads a dump of BSON to a file.
+
+    Reading BSON is 3-4 times faster than reading JSON with:
+      import json
+
+    Performance between cjson, simplejson, and other libraries is more
+    mixed.
+
+    Untested since move from filename to fp and refactoring
+    '''
+    return _read_bson_file(gzip.open(filename))
+
+
+def encode_to_bson(data):
+    '''
+    Encode to BSON. Encoding BSON is about the same speed as encoding
+    JSON (~25% faster), but decoding is much faster. 
+    '''
+    for d in data:
+        yield BSON.encode(d)
+
+
+_hash_memory = dict()
+def short_hash(string, length=3, memoize = False):
+    '''
+    Provide a compact hash of a string. Returns a hex string which is
+    the hash. length is the length of the string. 
+
+    This is helpful if we want to shard data.
+    '''
+    global _hash_memory
+    if memoize:
+        if string in _hash_memory: 
+            return _hash_memory[string]
+    m = md5.new()
+    m.update(string)
+    h = m.hexdigest()[0:length]
+    if memoize:
+        _hash_memory[string] = h
+    return h
+
+if __name__=='__main__':
+    print hash("Alice") != hash("Bob")
+    print hash("Eve") == hash("Eve")
+    print "Alice" not in _hash_memory
+    print hash("Eve", memoize=True) == hash("Eve", memoize=True)
+    print "Eve" in _hash_memory
+    print len(hash("Mallet")) == 3
+
+
+def sqs_lines():
+    '''
+    If we have a set of tracking log files on Amazon S3, this lets us
+    grab all of the lines, and process them. 
+
+    In most cases, this script would be running in parallel on a
+    cluster of machines. This lets us process many files quickly.
+
+    logs_to_sqs.py is a good helper script for setting things up. 
+
+    We do boto imports locally since this file otherwise does not rely
+    on AWS.
+    '''
+    import boto.sqs
+    from boto.s3.connection import S3Connection
+
+    s3_conn = S3Connection(aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'], aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
+    sqs_conn = boto.sqs.connect_to_region("us-east-1", aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'], aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
+
+    q = sqs_conn.get_queue(xanalytics.settings.settings["tracking-logs-queue"])
+    file_count = 0
+    total_bytes = 0
+    while q.count() > 0:
+        m = q.read(60*20) # We limit processing to 20 minutes per file
+        item = m.get_body()
+        file_count = file_count+1
+        print item
+
+        source_bucket = s3_conn.get_bucket(xanalytics.settings.settings['tracking-logs-bucket'])
+        key = source_bucket.get_key(item)
+        filename = "/mnt/tmp/log_"+uuid.uuid1().hex+".log"
+        key.get_contents_to_filename(filename)
+        try:
+            lines = gzip.open(filename).readlines()
+        except IOError:
+            lines = open(filename).readlines()
+        for line in lines:
+            yield line
+
+        total_bytes = total_bytes + key.size
+        print file_count, "files", item, total_bytes/1.e9, "GB"
+        q.delete_message(m)
+
+        os.unlink(filename)
+
+
+def filter_data(data, filter):
+    '''
+    Apply a function 'filter' to all elements in the data
+    '''
+    for item in data:
+        if filter(item):
+            yield item
+
+######
+##  Stream operations specific to edX
+######
+
+
 def decode_event(data):
     ''' Convert browser events from string to JSON
     '''
@@ -290,31 +396,6 @@ def date_gt_filter(data, date):
     for line in data:
         if dateutil.parser.parse(line["time"]) > date:
             yield line
-
-
-def json_to_text(data):
-    ''' Convert JSON back to text, for dumping to processed file
-    '''
-    for line in data:
-        yield json.dumps(line)+'\n'
-
-
-_data_part = 0
-_data_item = 0
-def save_data(data, directory):
-    '''Write data back to the directory specified. Data is dumped into
-    individual files, each a maximum of 20,000 events long. 
-    '''
-    global _data_part, _data_item
-    fout = None
-    for line in data:
-        if _data_item % 20000 == 0:
-            if fout:
-                fout.close()
-            fout = gzip.open(directory+'/part'+str(_data_part)+".gz", "w")
-            _data_part = _data_part + 1
-        fout.write(line)
-        _data_item = _data_item + 1
 
 
 def event_count(data):
@@ -443,15 +524,6 @@ def select_in(data, string):
             yield d
 
 
-def filter_data(data, filter):
-    '''
-    Apply a function 'filter' to all elements in the data
-    '''
-    for item in data:
-        if filter(item):
-            yield item
-
-
 def truncate_json(data, max_length):
     for d in data:
         t = _truncate_json(d, max_length)
@@ -513,101 +585,35 @@ def _read_bson_file(fp):
         yield BSON.decode(BSON(o))
 
 
-def read_bson_file(filename):
+_tokens = dict()
+_token_ct = 0
+def token(user):
     '''
-    Reads a dump of BSON to a file.
+    Generate a token for a username. The tokens are generated in order, so this is 
+    not generically secure. In this context, they are generate by the order users appear in the 
+    log file. 
 
-    Reading BSON is 3-4 times faster than reading JSON with:
-      import json
-
-    Performance between cjson, simplejson, and other libraries is more
-    mixed.
-
-    Untested since move from filename to fp and refactoring
+    Note that this is limited to courses with 140608 users for now (if
+    you go over, it will raise an exception).
     '''
-    return _read_bson_file(gzip.open(filename))
+    global _tokens, _token_ct
+    if user in _tokens:
+        return _tokens[user]
+    t = string.letters [ (_token_ct / (52*52)) % 52]  + string.letters [ (_token_ct / 52) % 52]  + string.letters [ _token_ct % 52]
+    _token_ct = _token_ct + 1
+    if _token_ct > 140607:
+        raise "We need to clean up tokenization code to support more users"
+    _tokens[user] = t
+    return t
 
 
-def encode_to_bson(data):
-    '''
-    Encode to BSON. Encoding BSON is about the same speed as encoding
-    JSON (~25% faster), but decoding is much faster. 
-    '''
-    for d in data:
-        yield BSON.encode(d)
+if __name__=="__main__":
+    names = map(str, range(100))
+    tokenized_once = map(token, names)
+    tokenized_twice = map(token, names)
+    # Confirm we have the same mapping if we pass a name through twice
+    print tokenized_once == tokenized_twice
+    # Confirm we have a different mapping for different users
+    print len(set(tokenized_once)) == len(tokenized_once)
 
 
-import md5
-
-_hash_memory = dict()
-def short_hash(string, length=3, memoize = False):
-    '''
-    Provide a compact hash of a string. Returns a hex string which is
-    the hash. length is the length of the string. 
-
-    This is helpful if we want to shard data.
-    '''
-    global _hash_memory
-    if memoize:
-        if string in _hash_memory: 
-            return _hash_memory[string]
-    m = md5.new()
-    m.update(string)
-    h = m.hexdigest()[0:length]
-    if memoize:
-        _hash_memory[string] = h
-    return h
-
-if __name__=='__main__':
-    print hash("Alice") != hash("Bob")
-    print hash("Eve") == hash("Eve")
-    print "Alice" not in _hash_memory
-    print hash("Eve", memoize=True) == hash("Eve", memoize=True)
-    print "Eve" in _hash_memory
-    print len(hash("Mallet")) == 3
-
-
-def sqs_lines():
-    '''
-    If we have a set of tracking log files on Amazon S3, this lets us
-    grab all of the lines, and process them. 
-
-    In most cases, this script would be running in parallel on a
-    cluster of machines. This lets us process many files quickly.
-
-    logs_to_sqs.py is a good helper script for setting things up. 
-
-    We do boto imports locally since this file otherwise does not rely
-    on AWS.
-    '''
-    import boto.sqs
-    from boto.s3.connection import S3Connection
-
-    s3_conn = S3Connection(aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'], aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
-    sqs_conn = boto.sqs.connect_to_region("us-east-1", aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'], aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
-
-    q = sqs_conn.get_queue(xanalytics.settings.settings["tracking-logs-queue"])
-    file_count = 0
-    total_bytes = 0
-    while q.count() > 0:
-        m = q.read(60*20) # We limit processing to 20 minutes per file
-        item = m.get_body()
-        file_count = file_count+1
-        print item
-
-        source_bucket = s3_conn.get_bucket(xanalytics.settings.settings['tracking-logs-bucket'])
-        key = source_bucket.get_key(item)
-        filename = "/mnt/tmp/log_"+uuid.uuid1().hex+".log"
-        key.get_contents_to_filename(filename)
-        try:
-            lines = gzip.open(filename).readlines()
-        except IOError:
-            lines = open(filename).readlines()
-        for line in lines:
-            yield line
-
-        total_bytes = total_bytes + key.size
-        print file_count, "files", item, total_bytes/1.e9, "GB"
-        q.delete_message(m)
-
-        os.unlink(filename)
