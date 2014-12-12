@@ -19,13 +19,13 @@ import argparse
 import dateutil.parser
 import gzip
 try:
-    import json
+    import simplejson as json
 except:
     try:
-        import simplejson as json
-    except:
-        os.system("pip install simplejson")
-        import simplejson as json
+        import json
+#    except:
+#        os.system("pip install simplejson")
+#        import simplejson as json
 import numbers
 import os
 import string
