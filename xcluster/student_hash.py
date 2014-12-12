@@ -76,4 +76,4 @@ for item in data:
     files[hash].write('\n')
 
 for file in files:
-    file.close()
+    files[file].close()
