@@ -21,8 +21,7 @@ import gzip
 try:
     import simplejson as json
 except:
-    try:
-        import json
+    import json
 #    except:
 #        os.system("pip install simplejson")
 #        import simplejson as json
