@@ -5,7 +5,9 @@ The eventual goal is to have per-user sorted stack traces.
 
 import uuid
 import gzip
+import platform
 import os
+import os.path
 import boto.sqs
 import xanalytics.settings
 from xanalytics.streaming import *
@@ -14,8 +16,8 @@ from boto.s3.connection import S3Connection
 
 s3_conn = S3Connection(aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'], aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
 
-filebase = "/mnt/"+os.getpid()+"/"+platform.node()
-if not os.exists(filebase):
+filebase = "/mnt/log/"+str(os.getpid())+"-"+platform.node()
+if not os.path.exists(filebase):
     os.makedirs(filebase)
 
 files = {}
@@ -32,14 +34,15 @@ def sqs_lines():
     import boto.sqs
     sqs_conn = boto.sqs.connect_to_region("us-east-1", aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'], aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
     q = sqs_conn.get_queue(xanalytics.settings.settings["tracking-logs-queue"])
+    file_count = 0
+    total_bytes = 0
     while q.count() > 0:
         m = q.read(60*20) # We limit processing to 20 minutes per file
-        b = m.get_body()
-        i = i+1
-        print b
-        s = process(b)
+        item = m.get_body()
+        file_count = file_count+1
+        print item
 
-        source_bucket = xanalytics.settings.settings['tracking-logs-bucket'])
+        source_bucket = s3_conn.get_bucket(xanalytics.settings.settings['tracking-logs-bucket'])
         key = source_bucket.get_key(item)
         filename = "/mnt/tmp/log_"+uuid.uuid1().hex+".log"
         key.get_contents_to_filename(filename)
@@ -48,10 +51,10 @@ def sqs_lines():
         except IOError:
             lines = open(filename).readlines()
         for line in lines:
-            yield lines
+            yield line
 
-        d = d + s
-        print i, "files", b, d/1.e9, "GB"
+        total_bytes = total_bytes + key.size
+        print file_count, "files", item, total_bytes/1.e9, "GB"
         q.delete_message(m)
 
         os.unlink(filename)
@@ -60,7 +63,7 @@ def sqs_lines():
 data = sqs_lines()
 data = text_to_json(data)
 data = remove_redundant_data(data)
-data = truncate_json(data)
+data = truncate_json(data, 200)
 
 files = {}
 
@@ -69,7 +72,7 @@ for item in data:
     hash = short_hash(user)
     if hash not in files:
         files[hash] = gzip.open(filebase+'/'+hash, "w")
-    files[hash].write(item)
+    files[hash].write(json.dumps(item, sort_keys=True))
     files[hash].write('\n')
 
 for file in files:

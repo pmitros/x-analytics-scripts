@@ -16,7 +16,7 @@ sqs_conn = boto.sqs.connect_to_region("us-east-1", aws_access_key_id=xanalytics.
 q = sqs_conn.get_queue(xanalytics.settings.settings["tracking-logs-queue"])
 
 for key in bucket.list():
-    if not key.name.startswith("logs"):
+    if not key.name.startswith("logs/tracking"):
         continue
 
     m = Message()
