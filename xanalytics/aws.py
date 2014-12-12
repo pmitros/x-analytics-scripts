@@ -1,10 +1,29 @@
+"""
+ Helper functions for doing big-data work on clusters on AWS. 
+
+ Basic trick: 
+ * List tracking log files into SQS (by filename):
+   `xanalytics.aws.sqs_enque(xanalytics.aws.list_s3_bucket())`
+ * Spun up a cluster of machines
+ * Do normal streaming operations on those machines, grabbing lines
+   from those files:
+   `data = xanalytics.aws.sqs_s3_deque_lines()`
+* Store results locally, and sync back to AWS (this should be moved 
+  into Python, but for now, just s3cmd sync)
+"""
+
+import uuid
+import gzip
+import os
+
 import boto.sqs
 from boto.sqs.message import Message
 from boto.s3.connection import S3Connection
 
+
 import xanalytics.settings
 
-def sqs_s3_deque():
+def sqs_s3_deque_lines():
     '''
     If we have a set of tracking log files on Amazon S3, this lets us
     grab all of the lines, and process them. 
@@ -31,7 +50,7 @@ def sqs_s3_deque():
 
         source_bucket = s3_conn.get_bucket(xanalytics.settings.settings['tracking-logs-bucket'])
         key = source_bucket.get_key(item)
-        filename = "/mnt/tmp/log_"+uuid.uuid1().hex+".log"
+        filename = "/tmp/log_"+uuid.uuid1().hex+".log"
         key.get_contents_to_filename(filename)
         try:
             lines = gzip.open(filename).readlines()
@@ -41,7 +60,8 @@ def sqs_s3_deque():
             yield line
 
         total_bytes = total_bytes + key.size
-        print file_count, "files", item, total_bytes/1.e9, "GB"
+        if True:
+            print file_count, "files", item, total_bytes/1.e9, "GB"
         q.delete_message(m)
 
         os.unlink(filename)
