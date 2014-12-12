@@ -565,3 +565,49 @@ if __name__=='__main__':
     print hash("Eve", memoize=True) == hash("Eve", memoize=True)
     print "Eve" in _hash_memory
     print len(hash("Mallet")) == 3
+
+
+def sqs_lines():
+    '''
+    If we have a set of tracking log files on Amazon S3, this lets us
+    grab all of the lines, and process them. 
+
+    In most cases, this script would be running in parallel on a
+    cluster of machines. This lets us process many files quickly.
+
+    logs_to_sqs.py is a good helper script for setting things up. 
+
+    We do boto imports locally since this file otherwise does not rely
+    on AWS.
+    '''
+    import boto.sqs
+    from boto.s3.connection import S3Connection
+
+    s3_conn = S3Connection(aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'], aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
+    sqs_conn = boto.sqs.connect_to_region("us-east-1", aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'], aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
+
+    q = sqs_conn.get_queue(xanalytics.settings.settings["tracking-logs-queue"])
+    file_count = 0
+    total_bytes = 0
+    while q.count() > 0:
+        m = q.read(60*20) # We limit processing to 20 minutes per file
+        item = m.get_body()
+        file_count = file_count+1
+        print item
+
+        source_bucket = s3_conn.get_bucket(xanalytics.settings.settings['tracking-logs-bucket'])
+        key = source_bucket.get_key(item)
+        filename = "/mnt/tmp/log_"+uuid.uuid1().hex+".log"
+        key.get_contents_to_filename(filename)
+        try:
+            lines = gzip.open(filename).readlines()
+        except IOError:
+            lines = open(filename).readlines()
+        for line in lines:
+            yield line
+
+        total_bytes = total_bytes + key.size
+        print file_count, "files", item, total_bytes/1.e9, "GB"
+        q.delete_message(m)
+
+        os.unlink(filename)
