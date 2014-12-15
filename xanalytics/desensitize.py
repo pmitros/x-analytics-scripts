@@ -39,6 +39,7 @@ import fs.osfs
 from xanalytics.gzipfs import GZIPFS
 
 from streaming import *
+from xevents import decode_event, remove_redundant_data, desensitize_data
 
 parser = argparse.ArgumentParser(description='Desensitize (but not anonymize) and clean edX data.')
 parser.add_argument("input", help="Input directory")
