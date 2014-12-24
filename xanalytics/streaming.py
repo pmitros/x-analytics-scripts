@@ -457,3 +457,44 @@ if __name__=="__main__":
     print len(set(tokenized_once)) == len(tokenized_once)
 
 
+def merge_generators(l, key=lambda x:x):
+    '''
+    Perform a merge of generators, keeping order. 
+
+    If inputs are sorted from greatest to least, output will be sorted likewise. 
+
+    Possible uses: 
+    * Hadoop-style merge sort.
+    * In-order output from multiprocess.py.
+    '''
+    l = map(iter, l)
+    def next(g):
+        '''
+        Get next iterm from a generator. 
+
+        If no more items, return None
+        '''
+        try: 
+            return g.next()
+        except StopIteration:
+            return None
+
+    def key_wrapper(a):
+        if a == None:
+            return None
+        else:
+            return key(a[1])
+
+    heads = [(i, l[i].next()) for i in range(len(l))]
+
+    while max(heads, key=key_wrapper)[1] != None:
+        item = max(heads, key=key_wrapper)
+        yield item[1]
+        heads[item[0]] = (item[0], next(l[item[0]]))
+        
+if __name__ == '__main__':
+    import random
+    a = sorted([random.randint(0,50) for x in range(10)], reverse=True)
+    b = sorted([random.randint(0,50) for x in range(10)], reverse=True)
+    c = sorted([random.randint(0,50) for x in range(10)], reverse=True)
+    print list(merge_generators([a,b,c])) == sorted(a+b+c, reverse = True)
