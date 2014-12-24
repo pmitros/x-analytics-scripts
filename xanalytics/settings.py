@@ -11,6 +11,8 @@ settings_files = ['/etc/xanalytics', '~/.xanalytics']
 class _settings(object):
     _settings = None
 
+    _settings_overrides = []
+
     def refresh(self):
         self._settings = dict()
         for f in settings_files:
@@ -19,10 +21,34 @@ class _settings(object):
                 self._settings.update(yaml.load(open(f)))
 
     def __getitem__(self, key):
+        for override in self._settings_overrides:
+            if key in override:
+                return override[key]
+
         return self._settings[key]
 
     def __contains__(self, key):
+        for override in self._settings_overrides:
+            if key in override:
+                return True
         return key in self._settings
+
+    def push_overrides(self, overrides):
+        '''
+        Override settings. Useful for test cases. Takes a dictionary of
+        new settings. Those override the old settings. pop returns
+        things back to normal.
+        '''
+        self._settings_overrides.insert(0, overrides)
+
+    def pop_overrides(self):
+        return self._settings_overrides.pop(0)
+
+    def get(self, item, default=None):
+        if item in self:
+            return self[item]
+        else:
+            return default
 
 settings = _settings()
 
@@ -59,83 +85,16 @@ def publicdatafs(namespace=False, compress=True):
 def edxdatafs(namespace=False, compress=True):
     return _fslookup(namespace, 'edx-data-dir', compress)
 
-
-
-
-
-
-
-
-
-##################
-## Deprecations ##
-##################
-
-# def _filelookup(filename, namespace, directory, output):
-#     '''
-#     Deprecated: Helper for file lookups below.
-#     '''
-#     basepath = settings[directory]
-#     if namespace:
-#         path = os.path.join(basepath, namespace)
-#         if not os.path.exists(path):
-#             os.mkdir(path)
-#     else:
-#         path = basepath
-
-#     filename = os.path.join(path, filename)
-#     if not output and not os.path.exists(filename):
-#         raise LookupError("No such file or directory {fn}".format(fn = filename))
-#     return filename
-
-
-# def edxdatafile(filename, namespace = False, output = False):
-#     '''
-#     Return the location of a datafile from the data file directory.
-
-#     If output is False (default), raise an exception if file does not
-#     exist.  Otherwise, return where the file ought to go.
-
-#     DEPRECATED: USE DIRECTORY-LEVEL METHODS
-#     '''
-#     return _filelookup(filename, namespace, 'edx-data-dir', output)
-
-
-# def publicdatafile(filename, namespace = False, output = False):
-#     '''
-#     Return the location of a datafile from the data file directory.
-
-#     If output is False (default), raise an exception if file does not
-#     exist.  Otherwise, return where the file ought to go.
-
-#     DEPRECATED: USE DIRECTORY-LEVEL METHODS
-#     '''
-#     return _filelookup(filename, namespace, 'public-data-dir', output)
-
-
-# def scratchfile(filename, namespace = False, output = True):
-#     '''
-#     Return the location of a datafile from the data file directory.
-
-#     If output is False (default), raise an exception if file does not
-#     exist.  Otherwise, return where the file ought to go.
-
-#     DEPRECATED: USE DIRECTORY-LEVEL METHODS
-#     '''
-#     return _filelookup(filename, namespace, 'scratch-dir', output)
-
-
-# def outputfile(filename, namespace = False, output = True):
-#     '''
-#     Return the location of a datafile from the data file directory.
-
-#     If output is False (default true), raise an exception if file does not
-#     exist.  Otherwise, return where the file ought to go.
-
-#     DEPRECATED: USE DIRECTORY-LEVEL METHODS
-#     '''
-#     return _filelookup(filename, namespace, 'output-dir', output)
-
-
-
-# datafile = publicdatafile  # DEPRECATED
+if __name__ == '__main__':
+    '''
+    Test that settings overrides work
+    '''
+    initial_max = settings.get("max-file-size")
+    settings.push_overrides({'max-file-size': 5})
+    print settings['max-file-size'] == 5
+    settings.push_overrides({'max-file-size': 10})
+    print settings['max-file-size'] == 10
+    print settings.pop_overrides() == {'max-file-size': 10}
+    print settings['max-file-size'] == 5
+    print settings.pop_overrides() == {'max-file-size': 5}
+    print settings['max-file-size'] == initial_max
