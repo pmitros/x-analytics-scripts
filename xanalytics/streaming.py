@@ -1,7 +1,9 @@
 '''
-This file contains streaming data processors. Why stream processing? A few reasons:
+This file contains streaming data processors. Why stream
+processing? A few reasons:
 
-1. You get immediate results. Development time is much faster. If you have a bug, you see it almost immediately.
+1. You get immediate results. Development time is much faster. If you
+   have a bug, you see it almost immediately.
 2. The code is more readable.
 
 Downsides:
@@ -12,6 +14,7 @@ See:
   http://www.dabeaz.com/generators/Generators.pdf
 
 For best practices.
+
 '''
 
 import argparse
@@ -69,7 +72,7 @@ def _to_filesystem(filesystem_or_directory):
     if isinstance(filesystem_or_directory, FS):
         return filesystem_or_directory
     elif isinstance(filesystem_or_directory, basestring):
-        warnings.warn("Warning: We're deprecating directory support in favor of pyfs.")
+        warnings.warn("We're deprecating directory support in favor of pyfs.")
         return fs.osfs.OSFS(filesystem_or_directory)
     else:
         raise AttributeError("Unrecognized parameter for filesystem argument: " + repr(filesystem))
@@ -87,7 +90,8 @@ def get_files(filesystem, directory=".", only_gz=False):
 
 
 if __name__ == "__main__":
-    # Confirm we can list the current directory, either as a string, or as a pyfilesystem
+    # Confirm we can list the current directory, either as a string,
+    # or as a pyfilesystem
     print "__init__.py" in list(get_files("."))
     import fs.osfs
     print "__init__.py" in list(get_files(fs.osfs.OSFS(".")))
@@ -121,14 +125,19 @@ def text_to_csv(line, csv_delimiter="\t", csv_header=False):
     '''
     if csv_header:
         # TODO
-        raise UnimplementedException("CSVs with headers don't work yet. Sorry. This is kind of a major hole.")
+        raise UnimplementedException("CSVs with headers don't work yet. Sorry. Major hole.")
     else:
         if line[-1] == '\n':
             line = line[:-1]
         return line.split(csv_delimiter)
 
 
-def read_data(filesystem, directory=".", only_gz=False, format="text", csv_delimiter="\t", csv_header=False):
+def read_data(filesystem,
+              directory=".",
+              only_gz=False,
+              format="text",
+              csv_delimiter="\t",
+              csv_header=False):
     '''Takes a pyfs containing log files. Returns an iterator of all
     lines in all files.
 
@@ -175,7 +184,8 @@ def text_to_json(line, clever=False):
             except:
                 pass
         print line
-        print "Warning: We've got a line we couldn't fix up. Please look at it, and add the right logic to streaming.py."
+        print "Warning: We've got a line we couldn't fix up."
+        print "Please look at it, and add the right logic to streaming.py."
         print "It's usually a new ending. Sometimes, it's detecting a non-JSON line of some form"
         os.exit(-1)
 
@@ -287,7 +297,7 @@ def list_short_hashes(length):
 
 if __name__ == "__main__":
     print "aa" in list(list_short_hashes(2))
-    print len(list(list_short_hashes(3))) == 16*16*16
+    print len(list(list_short_hashes(3))) == 16 ** 3
     print len(list(list_short_hashes(3))) == len(set(list_short_hashes(3)))
     print short_hash("Hello", 3) in list(list_short_hashes(3))
 
@@ -303,8 +313,6 @@ def filter_data(data, filter):
 ######
 ##  Stream operations specific to edX
 ######
-
-
 
 
 def event_count(data):
@@ -371,7 +379,7 @@ def sort_events(data, fields):
             if c != 0:
                 return c
         return 0
-    return sorted(list(data), cmp = event_cmp)
+    return sorted(list(data), cmp=event_cmp)
 
 
 def select_fields(data, fields):
@@ -392,6 +400,7 @@ def select_in(data, string):
     for d in data:
         if string in d:
             yield d
+
 
 def memoize(data, directory):
     '''
@@ -418,7 +427,7 @@ def memoize(data, directory):
 def _read_bson_file(fp):
     while True:
         l = f.read(4)
-        if len(l)<4:
+        if len(l) < 4:
             break
         length = struct.unpack('<i', l)
         o = l + f.read(length[0]-4)
@@ -439,7 +448,7 @@ def token(user):
     global _tokens, _token_ct
     if user in _tokens:
         return _tokens[user]
-    t = string.letters[(_token_ct / (52*52)) % 52] + string.letters[(_token_ct / 52) % 52] + string.letters[_token_ct % 52]
+    t = string.letters[(_token_ct / (52 * 52)) % 52] + string.letters[(_token_ct / 52) % 52] + string.letters[_token_ct % 52]
     _token_ct = _token_ct + 1
     if _token_ct > 140607:
         raise "We need to clean up tokenization code to support more users"
@@ -447,7 +456,7 @@ def token(user):
     return t
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     names = map(str, range(100))
     tokenized_once = map(token, names)
     tokenized_twice = map(token, names)
@@ -457,7 +466,7 @@ if __name__=="__main__":
     print len(set(tokenized_once)) == len(tokenized_once)
 
 
-def merge_generators(l, key=lambda x:x):
+def merge_generators(l, key=lambda x: x):
     '''
     Perform a merge of generators, keeping order.
 
