@@ -12,9 +12,10 @@
   into Python, but for now, just s3cmd sync)
 """
 
-import uuid
 import gzip
 import os
+import time
+import uuid
 
 import boto.sqs
 from boto.sqs.message import Message
@@ -93,12 +94,12 @@ def sqs_enque(data):
         q.write(m)
 
 
-def list_s3_bucket(prefix = "logs/tracking"):
+def list_s3_bucket(bucket_key = 'tracking-logs-bucket', prefix = "logs/tracking"):
     '''
     yield a list of all files that start with a given prefix.
     '''
     s3_conn = S3Connection(aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'], aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
-    bucket = s3_conn.get_bucket(xanalytics.settings.settings["tracking-logs-bucket"])
+    bucket = s3_conn.get_bucket(xanalytics.settings.settings[bucket_key])
 
     sqs_conn = boto.sqs.connect_to_region("us-east-1", aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'], aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
     q = sqs_conn.get_queue(xanalytics.settings.settings["tracking-logs-queue"])
@@ -107,3 +108,87 @@ def list_s3_bucket(prefix = "logs/tracking"):
         if not key.name.startswith(prefix):
             continue
         yield key.name.encode('utf-8')
+
+
+
+def get_hashed_files(name, prefixes, bucket_key='scratch-bucket', delete = False):
+    '''
+    Grab all files on AWS which were generated with streaming.short_hash().  
+
+    This is helpful for Hadoop-style operations. Each server on a
+    server farm can generate independent files with a hash of the key. The 
+    next set of servers can grab the set of files they want to process.
+
+    Example: 
+
+    If prefixes is: '/log/1', '/log/2', etc. 
+    If name is: 'aaa'
+    
+    This will iterate through all of the files named '/log/1/aaa',
+    '/log/2/aaa', etc., if they exist, and return an iterator over all
+    of the lines in those files.
+
+    If delete = True, it will delete those files once it is done with /all/ of them
+
+    '''
+    s3_conn = S3Connection(aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'], aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
+    bucket = s3_conn.get_bucket(xanalytics.settings.settings[bucket_key])
+
+    good_keys = list()
+
+    filename = "/tmp/log_"+uuid.uuid1().hex+".log"
+
+    for prefix in prefixes:
+        key_name = os.path.join(prefix, name)
+        key = bucket.get_key(key_name)
+        if key:
+            key.get_contents_to_filename(filename)
+
+            try:
+                lines = gzip.open(filename).readlines()
+                print "No IOError", key_name
+            except IOError:
+                print "IOError", key_name
+                lines = open(filename).readlines()
+            for line in lines:
+                yield line
+
+            good_keys.append(key_name)
+    
+    os.unlink(filename)
+
+    if delete:
+        bucket.delete_keys(good_keys)
+            
+
+
+def wait_for_spot_instance_fulfillment(conn, request_ids):
+    """
+    Wait until request for AWS spot instances have been fulfilled.
+
+    Loop through all pending request ids waiting for them to be fulfilled.
+    If there are still pending requests, sleep and check again in 10 seconds.
+    Only return when all spot requests have been fulfilled.
+
+    This is a bad idea for automated tasks as-is. AWS can choose to,
+    for example, fill five requests, and hold off on one. In such a case, 
+    this won't return (since not all have been fulfilled), but you'll still 
+    be paying for the instances which were. Using spot instances in automated
+    tasks requires a lot more in terms of timeouts, error-handling logic, etc.
+    """
+    while 'open' in [s.state for s in conn.get_all_spot_instance_requests([r.id for r in request_ids])]:
+        time.sleep(10)
+        print [s.state for s in conn.get_all_spot_instance_requests([r.id for r in request_ids])]
+    instance_ids = [r.instance_id for r in conn.get_all_spot_instance_requests([r.id for r in request_ids])]
+    instances = sum([list(r.instances) for r in conn.get_all_instances( instance_ids )], [])
+    ips = [i.ip_address for i in instances]
+    return ips
+
+'''
+Example: 
+
+l = list(list_s3_bucket('scratch-bucket', prefix=""))
+prefixes = list(set(["/".join(i.split('/')[:-1]) for i in l if 'forums' not in i and 'sample-data' not in i]))
+users = field_set(text_to_json(xanalytics.aws.get_files("aaa", prefixes)), "username")
+
+'''
