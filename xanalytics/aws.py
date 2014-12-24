@@ -1,14 +1,14 @@
 """
- Helper functions for doing big-data work on clusters on AWS. 
+ Helper functions for doing big-data work on clusters on AWS.
 
- Basic trick: 
+ Basic trick:
  * List tracking log files into SQS (by filename):
    `xanalytics.aws.sqs_enque(xanalytics.aws.list_s3_bucket())`
  * Spun up a cluster of machines
  * Do normal streaming operations on those machines, grabbing lines
    from those files:
    `data = xanalytics.aws.sqs_s3_deque_lines()`
-* Store results locally, and sync back to AWS (this should be moved 
+* Store results locally, and sync back to AWS (this should be moved
   into Python, but for now, just s3cmd sync)
 """
 
@@ -27,12 +27,12 @@ import xanalytics.settings
 def sqs_s3_deque_lines():
     '''
     If we have a set of tracking log files on Amazon S3, this lets us
-    grab all of the lines, and process them. 
+    grab all of the lines, and process them.
 
     In most cases, this script would be running in parallel on a
     cluster of machines. This lets us process many files quickly.
 
-    logs_to_sqs.py is a good helper script for setting things up. 
+    logs_to_sqs.py is a good helper script for setting things up.
 
     We do boto imports locally since this file otherwise does not rely
     on AWS.
@@ -70,18 +70,18 @@ def sqs_s3_deque_lines():
 
 def sqs_enque(data):
     '''
-    Send (string) data to an Amazon SQS queue. 
+    Send (string) data to an Amazon SQS queue.
 
-    Good uses: 
-    * Send a list of filenames of tracking files stored on S3. 
-      ~50k requests for around 3 pennies. 
+    Good uses:
+    * Send a list of filenames of tracking files stored on S3.
+      ~50k requests for around 3 pennies.
 
-    Bad uses: 
+    Bad uses:
     * Send all events to Amazon SQS as part of a pipeline. Each
       billion events runs us $500.
 
-    TODO: Batch operations. Would improve performance and cut cost 
-    10x. 
+    TODO: Batch operations. Would improve performance and cut cost
+    10x.
 
     (Untested)
     '''
@@ -113,17 +113,17 @@ def list_s3_bucket(bucket_key = 'tracking-logs-bucket', prefix = "logs/tracking"
 
 def get_hashed_files(name, prefixes, bucket_key='scratch-bucket', delete = False):
     '''
-    Grab all files on AWS which were generated with streaming.short_hash().  
+    Grab all files on AWS which were generated with streaming.short_hash().
 
     This is helpful for Hadoop-style operations. Each server on a
-    server farm can generate independent files with a hash of the key. The 
+    server farm can generate independent files with a hash of the key. The
     next set of servers can grab the set of files they want to process.
 
-    Example: 
+    Example:
 
-    If prefixes is: '/log/1', '/log/2', etc. 
+    If prefixes is: '/log/1', '/log/2', etc.
     If name is: 'aaa'
-    
+
     This will iterate through all of the files named '/log/1/aaa',
     '/log/2/aaa', etc., if they exist, and return an iterator over all
     of the lines in those files.
@@ -154,12 +154,12 @@ def get_hashed_files(name, prefixes, bucket_key='scratch-bucket', delete = False
                 yield line
 
             good_keys.append(key_name)
-    
+
     os.unlink(filename)
 
     if delete:
         bucket.delete_keys(good_keys)
-            
+
 
 
 def wait_for_spot_instance_fulfillment(conn, request_ids):
@@ -171,8 +171,8 @@ def wait_for_spot_instance_fulfillment(conn, request_ids):
     Only return when all spot requests have been fulfilled.
 
     This is a bad idea for automated tasks as-is. AWS can choose to,
-    for example, fill five requests, and hold off on one. In such a case, 
-    this won't return (since not all have been fulfilled), but you'll still 
+    for example, fill five requests, and hold off on one. In such a case,
+    this won't return (since not all have been fulfilled), but you'll still
     be paying for the instances which were. Using spot instances in automated
     tasks requires a lot more in terms of timeouts, error-handling logic, etc.
     """
@@ -185,7 +185,7 @@ def wait_for_spot_instance_fulfillment(conn, request_ids):
     return ips
 
 '''
-Example: 
+Example:
 
 l = list(list_s3_bucket('scratch-bucket', prefix=""))
 prefixes = list(set(["/".join(i.split('/')[:-1]) for i in l if 'forums' not in i and 'sample-data' not in i]))

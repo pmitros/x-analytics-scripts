@@ -35,7 +35,7 @@ from fs.base import FS
 
 import fs.osfs
 
-from bson import BSON  #  from pymongo in pip
+from bson import BSON
 
 import xanalytics.settings
 
@@ -52,17 +52,17 @@ def filter_map(f, *args):
     def map_stream(data, *fargs):
         for d in data:
             if d is not None:
-                o = f(d, *(args+fargs))
+                o = f(d, *(args + fargs))
                 if o:
-                    yield o 
+                    yield o
     return map_stream
 
 
 def _to_filesystem(filesystem_or_directory):
     '''
-    Take a pyfilesystem or directory. 
+    Take a pyfilesystem or directory.
 
-    If a directory, return a pyfilesystem. 
+    If a directory, return a pyfilesystem.
 
     This gives backwards-compatibility with code before we moved to pyfs
     '''
@@ -72,12 +72,12 @@ def _to_filesystem(filesystem_or_directory):
         warnings.warn("Warning: We're deprecating directory support in favor of pyfs.")
         return fs.osfs.OSFS(filesystem_or_directory)
     else:
-        raise AttributeError("Unrecognized parameter for filesystem argument: "+repr(filesystem))
+        raise AttributeError("Unrecognized parameter for filesystem argument: " + repr(filesystem))
 
 
-def get_files(filesystem, directory = ".", only_gz = False):
+def get_files(filesystem, directory=".", only_gz=False):
     '''
-    Return an iterator of all the files in a given directory or pyfilesystem.     
+    Return an iterator of all the files in a given directory or pyfilesystem.
     '''
     filesystem = _to_filesystem(filesystem)
     for f in sorted(filesystem.listdir(directory)):
@@ -86,14 +86,14 @@ def get_files(filesystem, directory = ".", only_gz = False):
         yield f
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     # Confirm we can list the current directory, either as a string, or as a pyfilesystem
     print "__init__.py" in list(get_files("."))
     import fs.osfs
     print "__init__.py" in list(get_files(fs.osfs.OSFS(".")))
 
 
-def _read_text_data(filesystem, directory = ".", only_gz = False):
+def _read_text_data(filesystem, directory=".", only_gz=False):
     '''
     Helper: Yield all the lines in all the files in a directory.
 
@@ -104,7 +104,7 @@ def _read_text_data(filesystem, directory = ".", only_gz = False):
     for f in filesystem.listdir(directory):
         if only_gz and not f.endswith(".gz"):
             continue
-        for line in filesystem.open(directory+"/"+f):
+        for line in filesystem.open(directory + "/" + f):
             yield line.encode('ascii', 'ignore')
 
 
@@ -115,7 +115,7 @@ def _read_bson_data(filesystem, directory):
 
 
 @filter_map
-def text_to_csv(line, csv_delimiter="\t", csv_header = False):
+def text_to_csv(line, csv_delimiter="\t", csv_header=False):
     '''
     Untested
     '''
@@ -128,12 +128,12 @@ def text_to_csv(line, csv_delimiter="\t", csv_header = False):
         return line.split(csv_delimiter)
 
 
-def read_data(filesystem, directory = ".", only_gz = False, format="text", csv_delimiter="\t", csv_header = False):
+def read_data(filesystem, directory=".", only_gz=False, format="text", csv_delimiter="\t", csv_header=False):
     '''Takes a pyfs containing log files. Returns an iterator of all
     lines in all files.
 
     Optional: Skip non-.gz files.
-    Optional: Format can be text, JSON, or BSON, in which case, we'll decode. 
+    Optional: Format can be text, JSON, or BSON, in which case, we'll decode.
     '''
     filesystem = _to_filesystem(filesystem)
     if format == "text":
@@ -145,14 +145,14 @@ def read_data(filesystem, directory = ".", only_gz = False, format="text", csv_d
         return _read_bson_data(filesystem, directory)
     elif format == "csv":
         return text_to_csv(_read_text_data(filesystem, directory, only_gz), csv_delimiter, csv_header)
-    else: 
+    else:
         raise AttributeError("Unknown format: ", format)
 
 
 @filter_map
 def text_to_json(line, clever=False):
-    '''Decode lines to JSON. If a line is truncated, this will drop the line. 
-    
+    '''Decode lines to JSON. If a line is truncated, this will drop the line.
+
     clever allows us to try to reconstruct long lines. This is not
     helpful for most analytics due to performance, but it is in cases
     where we need every last bit of data.
@@ -163,14 +163,14 @@ def text_to_json(line, clever=False):
         return None
     if len(line) == 0:
         return None
-    if line[0] not in ['{']: # Tracking logs are always dicts
+    if line[0] not in ['{']:  # Tracking logs are always dicts
         return None
 
     if clever:
         endings = ['', '}', '"}', '""}', '"}}', '"}}}', '"}}}}', '"}}}}}', '"}}}}}}']
-        for ending in endings: 
+        for ending in endings:
             try:
-                line = json.loads(line+ending)
+                line = json.loads(line + ending)
                 return line
             except:
                 pass
@@ -179,10 +179,10 @@ def text_to_json(line, clever=False):
         print "It's usually a new ending. Sometimes, it's detecting a non-JSON line of some form"
         os.exit(-1)
 
-    # We've truncated lines to random lengths in the past... 
+    # We've truncated lines to random lengths in the past...
     if len(line) in range(32000, 33000):
         return None
-    elif len(line) in range(9980,10001):
+    elif len(line) in range(9980, 10001):
         return None
     elif len(line) in range(2039, 2044):
         return None
@@ -196,7 +196,7 @@ def text_to_json(line, clever=False):
 
 
 if __name__ == '__main__':
-    data = ("""{"a":"b"}""","""["c","d"]""",)
+    data = ("""{"a":"b"}""", """["c", "d"]""", )
     print list(text_to_json(data)) == [{u'a': u'b'}]
 
 
@@ -204,14 +204,14 @@ def json_to_text(data):
     ''' Convert JSON back to text, for dumping to processed file
     '''
     for line in data:
-        yield json.dumps(line)+'\n'
+        yield json.dumps(line) + '\n'
 
 
 _data_part = 0
 _data_item = 0
 def save_data(data, directory):
     '''Write data back to the directory specified. Data is dumped into
-    individual files, each a maximum of 20,000 events long. 
+    individual files, each a maximum of 20, 000 events long.
     '''
     global _data_part, _data_item
     fout = None
@@ -219,7 +219,7 @@ def save_data(data, directory):
         if _data_item % 20000 == 0:
             if fout:
                 fout.close()
-            fout = gzip.open(directory+'/part'+str(_data_part)+".gz", "w")
+            fout = gzip.open(directory + '/part' + str(_data_part) + ".gz", "w")
             _data_part = _data_part + 1
         fout.write(line)
         _data_item = _data_item + 1
@@ -243,23 +243,23 @@ def read_bson_file(filename):
 def encode_to_bson(data):
     '''
     Encode to BSON. Encoding BSON is about the same speed as encoding
-    JSON (~25% faster), but decoding is much faster. 
+    JSON (~25% faster), but decoding is much faster.
     '''
     for d in data:
         yield BSON.encode(d)
 
 
 _hash_memory = dict()
-def short_hash(string, length=3, memoize = False):
+def short_hash(string, length=3, memoize=False):
     '''
     Provide a compact hash of a string. Returns a hex string which is
-    the hash. length is the length of the string. 
+    the hash. length is the length of the string.
 
     This is helpful if we want to shard data.
     '''
     global _hash_memory
     if memoize:
-        if string in _hash_memory: 
+        if string in _hash_memory:
             return _hash_memory[string]
     m = md5.new()
     m.update(string)
@@ -268,7 +268,7 @@ def short_hash(string, length=3, memoize = False):
         _hash_memory[string] = h
     return h
 
-if __name__=='__main__':
+if __name__ == '__main__':
     print short_hash("Alice") != short_hash("Bob")
     print short_hash("Eve") == short_hash("Eve")
     print "Alice" not in _hash_memory
@@ -281,7 +281,7 @@ def list_short_hashes(length):
     '''
     A generator of all hashes of length `length` (as would be generated by short_hash)
     '''
-    generator = ("".join(x) for x in itertools.product("0123456789abcdef", repeat = length))
+    generator = ("".join(x) for x in itertools.product("0123456789abcdef", repeat=length))
     return generator
 
 
@@ -348,13 +348,13 @@ def dbic(data, label):
 def __select_field(event, field):
     '''
     Takes a field definition and a dictionary. Does a hierarchical query.
-    __select_field(event, "event:element") is equivalent to: 
+    __select_field(event, "event:element") is equivalent to:
     try:
       event['event']['element']
     except KeyError:
       return None
     '''
-    for key in field.split(":"):  # Pick out the hierarchy 
+    for key in field.split(":"):  # Pick out the hierarchy
         if key not in event:
             return None
         event = event[key]
@@ -397,12 +397,12 @@ def memoize(data, directory):
     '''
     UNTESTED/UNTESTED/UNTESTED
 
-    Check if the directory already has data. If so, read it in. Otherwise, dump 
-    data to the directory and return it. 
+    Check if the directory already has data. If so, read it in. Otherwise, dump
+    data to the directory and return it.
 
-    The current version reads/writes redundantly on the save operation, and 
+    The current version reads/writes redundantly on the save operation, and
     JSON decodes redundantly, so it's not very performant. This would be worth
-    fixing. 
+    fixing.
 
     UNTESTED/UNTESTED/UNTESTED
     '''
@@ -429,9 +429,9 @@ _tokens = dict()
 _token_ct = 0
 def token(user):
     '''
-    Generate a token for a username. The tokens are generated in order, so this is 
-    not generically secure. In this context, they are generate by the order users appear in the 
-    log file. 
+    Generate a token for a username. The tokens are generated in order, so this is
+    not generically secure. In this context, they are generate by the order users appear in the
+    log file.
 
     Note that this is limited to courses with 140608 users for now (if
     you go over, it will raise an exception).
@@ -439,7 +439,7 @@ def token(user):
     global _tokens, _token_ct
     if user in _tokens:
         return _tokens[user]
-    t = string.letters [ (_token_ct / (52*52)) % 52]  + string.letters [ (_token_ct / 52) % 52]  + string.letters [ _token_ct % 52]
+    t = string.letters[(_token_ct / (52*52)) % 52] + string.letters[(_token_ct / 52) % 52] + string.letters[_token_ct % 52]
     _token_ct = _token_ct + 1
     if _token_ct > 140607:
         raise "We need to clean up tokenization code to support more users"
@@ -459,22 +459,23 @@ if __name__=="__main__":
 
 def merge_generators(l, key=lambda x:x):
     '''
-    Perform a merge of generators, keeping order. 
+    Perform a merge of generators, keeping order.
 
-    If inputs are sorted from greatest to least, output will be sorted likewise. 
+    If inputs are sorted from greatest to least, output will be sorted likewise.
 
-    Possible uses: 
+    Possible uses:
     * Hadoop-style merge sort.
     * In-order output from multiprocess.py.
     '''
     l = map(iter, l)
+
     def next(g):
         '''
-        Get next iterm from a generator. 
+        Get next iterm from a generator.
 
         If no more items, return None
         '''
-        try: 
+        try:
             return g.next()
         except StopIteration:
             return None
@@ -491,10 +492,10 @@ def merge_generators(l, key=lambda x:x):
         item = max(heads, key=key_wrapper)
         yield item[1]
         heads[item[0]] = (item[0], next(l[item[0]]))
-        
+
 if __name__ == '__main__':
     import random
-    a = sorted([random.randint(0,50) for x in range(10)], reverse=True)
-    b = sorted([random.randint(0,50) for x in range(10)], reverse=True)
-    c = sorted([random.randint(0,50) for x in range(10)], reverse=True)
-    print list(merge_generators([a,b,c])) == sorted(a+b+c, reverse = True)
+    a = sorted([random.randint(0, 50) for x in range(10)], reverse=True)
+    b = sorted([random.randint(0, 50) for x in range(10)], reverse=True)
+    c = sorted([random.randint(0, 50) for x in range(10)], reverse=True)
+    print list(merge_generators([a, b, c])) == sorted(a + b + c, reverse=True)

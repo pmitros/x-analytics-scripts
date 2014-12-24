@@ -7,6 +7,7 @@ from xanalytics.gzipfs import GZIPFS
 
 settings_files = ['/etc/xanalytics', '~/.xanalytics']
 
+
 class _settings(object):
     _settings = None
 
@@ -36,23 +37,26 @@ def _fslookup(namespace, directory, compress):
             os.mkdir(path)
     else:
         path = basepath
-    
+
     if compress:
         return GZIPFS(path)
     else:
         return fs.osfs.OSFS(path)
 
 
-def outputfs(namespace = False, compress=True):
+def outputfs(namespace=False, compress=True):
     return _fslookup(namespace, 'output-dir', compress)
 
-def scratchfs(namespace = False, compress=True):
+
+def scratchfs(namespace=False, compress=True):
     return _fslookup(namespace, 'scratch-dir', compress)
 
-def publicdatafs(namespace = False, compress=True):
+
+def publicdatafs(namespace=False, compress=True):
     return _fslookup(namespace, 'public-data-dir', compress)
 
-def edxdatafs(namespace = False, compress=True):
+
+def edxdatafs(namespace=False, compress=True):
     return _fslookup(namespace, 'edx-data-dir', compress)
 
 
@@ -87,7 +91,7 @@ def edxdatafs(namespace = False, compress=True):
 
 # def edxdatafile(filename, namespace = False, output = False):
 #     '''
-#     Return the location of a datafile from the data file directory. 
+#     Return the location of a datafile from the data file directory.
 
 #     If output is False (default), raise an exception if file does not
 #     exist.  Otherwise, return where the file ought to go.
@@ -99,7 +103,7 @@ def edxdatafs(namespace = False, compress=True):
 
 # def publicdatafile(filename, namespace = False, output = False):
 #     '''
-#     Return the location of a datafile from the data file directory. 
+#     Return the location of a datafile from the data file directory.
 
 #     If output is False (default), raise an exception if file does not
 #     exist.  Otherwise, return where the file ought to go.
@@ -111,7 +115,7 @@ def edxdatafs(namespace = False, compress=True):
 
 # def scratchfile(filename, namespace = False, output = True):
 #     '''
-#     Return the location of a datafile from the data file directory. 
+#     Return the location of a datafile from the data file directory.
 
 #     If output is False (default), raise an exception if file does not
 #     exist.  Otherwise, return where the file ought to go.
@@ -123,7 +127,7 @@ def edxdatafs(namespace = False, compress=True):
 
 # def outputfile(filename, namespace = False, output = True):
 #     '''
-#     Return the location of a datafile from the data file directory. 
+#     Return the location of a datafile from the data file directory.
 
 #     If output is False (default true), raise an exception if file does not
 #     exist.  Otherwise, return where the file ought to go.
