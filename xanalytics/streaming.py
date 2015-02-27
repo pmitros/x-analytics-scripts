@@ -221,10 +221,12 @@ _data_part = 0
 _data_item = 0
 def save_data(data, directory):
     '''Write data back to the directory specified. Data is dumped into
-    individual files, each a maximum of 20, 000 events long.
+    individual files, each a maximum of 20,000 events long (by
+    default, overridable in settings).
     '''
     global _data_part, _data_item
     fout = None
+    max_file_length = int(settings.settings.get('max-file-size', 20000))
     for line in data:
         if _data_item % 20000 == 0:
             if fout:

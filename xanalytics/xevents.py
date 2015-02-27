@@ -3,7 +3,7 @@ try:
 except:
     import json
 
-from xanalytics.streaming import token
+from xanalytics.streaming import token, __select_field
 
 def decode_event(data):
     ''' Convert browser events from string to JSON
