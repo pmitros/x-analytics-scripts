@@ -1,1 +1,6 @@
 sentinel
+python-dateutil
+fs
+pymongo
+pyyaml
+pep8
