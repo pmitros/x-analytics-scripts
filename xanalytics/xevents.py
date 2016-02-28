@@ -10,8 +10,15 @@ import numbers
 from xanalytics.streaming import token, __select_field
 
 
-def decode_event(data):
-    ''' Convert browser events from string to JSON
+def decode_browser_event(data):
+    '''
+    Browser events will often have the event portion of the event JSON
+    as a string. This advertises that the browser-side event is from
+    an untrusted source. This decodes the browser events from string
+    form.
+
+    >>> list(decode_browser_event([{"event":"[1,2,3]"}, {"c":"d"}]))
+    [{'event': [1, 2, 3]}, {'c': 'd'}]
     '''
     for line in data:
         if 'event' in line:
@@ -21,13 +28,24 @@ def decode_event(data):
             except ValueError:
                 line['event'] = 'Truncated'
             yield line
+        else:  ## Should never happen
+            yield line    
 
 
 def desensitize_data(data, sensitive_fields, sensitive_event_fields):
-    '''Remove known-sensitive fields and replace usernames with tokens.
+    '''
+    Remove known-sensitive fields and replace usernames with tokens.
 
     This does not fully deidentify data. It is helpful, however, for
-    preventing a range of simple slip-ups in data handling.
+    preventing a range of simple slip-ups in data handling. By 
+    replacing simple PII, it's a lot harder to e.g. run into the
+    name of someone we know while processing data.
+
+    >>> test_data = [{"username": "Bob", \
+                      "c": "d", \
+                      "event": {"a":"b", "password": "foo"}}]
+    >>> list(desensitize_data(test_data, ["username"], ["password"]))
+    [{'c': 'd', 'event': {'a': 'b'}}]
     '''
     for line in data:
         for item in sensitive_fields:
@@ -37,7 +55,7 @@ def desensitize_data(data, sensitive_fields, sensitive_event_fields):
                 del line['context'][item]
         for item in sensitive_event_fields:
             if 'event' in line and item in line["event"]:
-                del line["event"]["item"]
+                del line["event"][item]
 
         if 'username' in line:
             line['username'] = token(line['username'])
@@ -47,6 +65,12 @@ def desensitize_data(data, sensitive_fields, sensitive_event_fields):
 def remove_redundant_data(data):
     '''Some versions of edX would put event data both at the top-level
     and in context. This cleans this up by removing it from context.
+
+    >>> test_data = [{"username": "bob", \
+                      "context": {"username": "bob", \
+                                  "date": "today"}}]
+    >>> list(remove_redundant_data(test_data))
+    [{'username': 'bob', 'context': {'date': 'today'}}]
     '''
     for line in data:
         if 'context' in line:
