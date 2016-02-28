@@ -31,10 +31,13 @@ import fs.tempfs
 import heapq
 import itertools
 import md5
+import sys
 import time
 import uuid
 
 import xanalytics.multiprocess
+
+from xanalytics.streaming import snoop
 
 def filename_generator():
     '''
@@ -113,7 +116,7 @@ def quick_sort_sets(data_source,
         return filename
 
     for item in data_source:
-        items.append((key(item), item))
+        items.append((key(item), item.strip()))
         total_size[0] += ram_requirements(item)
         if total_size[0] > ramsize:
             yield finalize()
@@ -146,6 +149,7 @@ def megasort(data_source,
 
     start_time = time.time()
 
+    # First, we make a bunch of small, internally-sorted files. Each line has a key, tab, then line.
     file_iter = quick_sort_sets(data_source, #xanalytics.multiprocess.split(data_source, 16),
                                 filesystem,
                                 key,
@@ -157,37 +161,47 @@ def megasort(data_source,
 
     remaining_files = itertools.chain(file_iter, files)
 
-    #for f in file_iter: # xanalytics.multiprocess.join(file_iter):
-    #    files.append(f)
-    
-    #data_source = split(data_source, 8)
     fg = file_generator(filesystem)
-    #print "Sort pass", time.time()-start_time
 
+    # Now, we merge these files. 
     while True:
+        # We grab the first bunch of files
         working_files = list(itertools.islice(remaining_files, file_limit))#        files[:file_limit]
         if len(working_files) < 2:
             break
+        # We grab pointers to data from those files
         working_filepointers = ((x.split('\t') for x in filesystem.open(fn)) for fn in working_files)
+        # We merge them
         output = heapq.merge(*working_filepointers)
+        # We make a new file, and dump the merged results there
         (filename, filepointer) = fg.next()
         filepointer.writelines(unicode("\t".join(line)) for line in output)
         filepointer.close()
+        # And we update out file list with the new file, removing the old ones
         files.append(filename)
         for file in working_files:
             filesystem.remove(file)
-        print "Sort pass", len(files), time.time()-start_time
+        print >> sys.stderr, "Sort pass", len(files), time.time()-start_time
 
-    # We might end up with the final file in either files or working_files,
+    # We might end up with the final file in working_files or not,
     # depending on how things line up with the islice above. If we run
     # out of items in working_files, then hit the end of the
     # generator, and then add to files, the generator will be done,
-    # and we'll end up with the filename in files. If we run out of
-    # files but don't hit the end of the generator, we'll end up with
-    # this in working files.
-    out = filesystem.open((working_files+files)[0])
+    # and we'll end up with the filename only in files. If we run out
+    # of files but don't hit the end of the generator, we'll end up
+    # with this in working files and files. It stays in files either
+    # way (for now) since that's an array.
+    print >> sys.stderr, "Working:", working_files
+    print >> sys.stderr, "Files:", files
+    print >> sys.stderr, "Combined:", working_files+files
+    print >> sys.stderr, filesystem.listdir()
+    out = filesystem.open(files[-1])
     for line in out:
-        line = line.split('\t')[1]
+        try:
+            line = line.split('\t')[1]
+        except:
+            print >> sys.stderr, "[",line,"]"
+            raise
         yield line.strip()
 
 if __name__=='__main__':

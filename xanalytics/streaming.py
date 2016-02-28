@@ -510,3 +510,8 @@ if __name__ == '__main__':
     b = sorted([random.randint(0, 50) for x in range(10)], reverse=True)
     c = sorted([random.randint(0, 50) for x in range(10)], reverse=True)
     print list(merge_generators([a, b, c])) == sorted(a + b + c, reverse=True)
+
+def snoop(data):
+    for item in data:
+        print item
+        yield item
