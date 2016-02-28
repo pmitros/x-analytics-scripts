@@ -43,7 +43,7 @@ from bson import BSON
 import xanalytics.settings
 
 ######
-## Generic functions to stream processing in Python
+# Generic functions to stream processing in Python
 ######
 
 
@@ -75,7 +75,9 @@ def _to_filesystem(filesystem_or_directory):
         warnings.warn("We're deprecating directory support in favor of pyfs.")
         return fs.osfs.OSFS(filesystem_or_directory)
     else:
-        raise AttributeError("Unrecognized parameter for filesystem argument: " + repr(filesystem))
+        error = "Unrecognized filesystem parameter: " + \
+                repr(filesystem_or_directory)
+        raise AttributeError(error)
 
 
 def get_files(filesystem, directory=".", only_gz=False):
@@ -98,7 +100,8 @@ def _read_text_data(filesystem, directory=".", only_gz=False):
     '''
     Helper: Yield all the lines in all the files in a directory.
 
-    The only_gz helps with edX directories which contain a mixture of useful and useless files.
+    The only_gz helps with edX directories which contain a mixture of
+    useful and useless files.
     '''
     filesystem = _to_filesystem(filesystem)
 
@@ -111,7 +114,8 @@ def _read_text_data(filesystem, directory=".", only_gz=False):
 
 def _read_bson_data(filesystem, directory):
     for f in get_files(filesystem, directory, only_gz):
-        for line in _read_bson_file(filesystem.open(os.path.join(directory, f))):
+        fp = filesystem.open(os.path.join(directory, f))
+        for line in _read_bson_file(fp):
             yield line
 
 
@@ -122,7 +126,8 @@ def text_to_csv(line, csv_delimiter="\t", csv_header=False):
     '''
     if csv_header:
         # TODO
-        raise UnimplementedException("CSVs with headers don't work yet. Sorry. Major hole.")
+        raise UnimplementedException("CSVs with headers don't work yet. "
+                                     "Sorry. Major hole.")
     else:
         if line[-1] == '\n':
             line = line[:-1]
@@ -142,15 +147,17 @@ def read_data(filesystem,
     Optional: Format can be text, JSON, or BSON, in which case, we'll decode.
     '''
     filesystem = _to_filesystem(filesystem)
-    if format == "text":
-        return _read_text_data(filesystem, directory, only_gz)
-    elif format == "json":
-        return text_to_json(_read_text_data(filesystem, directory, only_gz))
-    elif format == "bson":
+    if format == "bson":
         warnings.warn("Untested code path")
         return _read_bson_data(filesystem, directory)
+
+    text_data = _read_text_data(filesystem, directory, only_gz)
+    if format == "text":
+        return text_data
+    elif format == "json":
+        return text_to_json(text_data)
     elif format == "csv":
-        return text_to_csv(_read_text_data(filesystem, directory, only_gz), csv_delimiter, csv_header)
+        return text_to_csv(text_data, csv_delimiter, csv_header)
     else:
         raise AttributeError("Unknown format: ", format)
 
@@ -176,17 +183,19 @@ def text_to_json(line, clever=False):
         return None
 
     if clever:
-        endings = ['', '}', '"}', '""}', '"}}', '"}}}', '"}}}}', '"}}}}}', '"}}}}}}']
+        endings = ['', '}', '"}', '""}', '"}}', '"}}}',
+                   '"}}}}', '"}}}}}', '"}}}}}}']
         for ending in endings:
             try:
                 line = json.loads(line + ending)
                 return line
             except:
                 pass
-        print line
-        print "Warning: We've got a line we couldn't fix up."
-        print "Please look at it, and add the right logic to streaming.py."
-        print "It's usually a new ending. Sometimes, it's detecting a non-JSON line of some form"
+        print >>sys.stderr, line
+        print >>sys.stderr, "Warning: We've got a line we couldn't fix up.\n" \
+            "Please look at it, and add the right logic to streaming.py.\n" \
+            "It's usually a new ending. Sometimes, it's "\
+            "detecting a non-JSON line of some form"
         os.exit(-1)
 
     # We've truncated lines to random lengths in the past...
@@ -202,7 +211,6 @@ def text_to_json(line, clever=False):
     except ValueError:
         print line, len(line)
         return None
-        #raise
 
 
 def json_to_text(data):
@@ -214,8 +222,11 @@ def json_to_text(data):
 
 _data_part = 0
 _data_item = 0
+
+
 def save_data(data, directory):
-    '''Write data back to the directory specified. Data is dumped into
+    '''
+    Write data back to the directory specified. Data is dumped into
     individual files, each a maximum of 20,000 events long (by
     default, overridable in settings).
     '''
@@ -226,7 +237,9 @@ def save_data(data, directory):
         if _data_item % 20000 == 0:
             if fout:
                 fout.close()
-            fout = gzip.open(directory + '/part' + str(_data_part) + ".gz", "w")
+            filename = "{dir}/part{part}.gz".format(dir=directory,
+                                                    part=_data_part)
+            fout = gzip.open(filename, "w")
             _data_part = _data_part + 1
         fout.write(line)
         _data_item = _data_item + 1
@@ -257,6 +270,8 @@ def encode_to_bson(data):
 
 
 _hash_memory = dict()
+
+
 def short_hash(string, length=3, memoize=False):
     '''
     Provide a compact hash of a string. Returns a hex string which is
@@ -292,7 +307,8 @@ def short_hash(string, length=3, memoize=False):
 
 def list_short_hashes(length):
     '''
-    A generator of all hashes of length `length` (as would be generated by short_hash)
+    A generator of all hashes of length `length` (as would be
+    generated by short_hash)
 
     Hashes are of the form we expect
     >>> "aa" in list(list_short_hashes(2))
@@ -308,7 +324,8 @@ def list_short_hashes(length):
     >>> short_hash("Hello", 3) in list(list_short_hashes(3))
     True
     '''
-    generator = ("".join(x) for x in itertools.product("0123456789abcdef", repeat=length))
+    generator = ("".join(x)
+                 for x in itertools.product("0123456789abcdef", repeat=length))
     return generator
 
 
@@ -321,7 +338,7 @@ def filter_data(data, filter):
             yield item
 
 ######
-##  Stream operations specific to edX
+#  Stream operations specific to edX
 ######
 
 
@@ -394,7 +411,8 @@ def sort_events(data, fields):
 
 def select_fields(data, fields):
     '''
-    Filter data down to a subset of fields. Also, flatten (should be a param in the future whether to do this.
+    Filter data down to a subset of fields. Also, flatten (should be a
+    param in the future whether to do this.
     '''
     for d in data:
         d2 = {}
@@ -446,11 +464,13 @@ def _read_bson_file(fp):
 
 _tokens = dict()
 _token_ct = 0
+
+
 def token(user):
     '''
-    Generate a token for a username. The tokens are generated in order, so this is
-    not generically secure. In this context, they are generate by the order users appear in the
-    log file.
+    Generate a token for a username. The tokens are generated in
+    order, so this is not generically secure. In this context, they
+    are generate by the order users appear in the log file.
 
     Note that this is limited to courses with 140608 users for now (if
     you go over, it will raise an exception).
@@ -465,11 +485,14 @@ def token(user):
     Confirm we have a different mapping for different users
     >>> len(set(tokenized_once)) == len(tokenized_once)
     True
+
     '''
     global _tokens, _token_ct
     if user in _tokens:
         return _tokens[user]
-    t = string.letters[(_token_ct / (52 * 52)) % 52] + string.letters[(_token_ct / 52) % 52] + string.letters[_token_ct % 52]
+    t = string.letters[(_token_ct / (52 * 52)) % 52] + \
+        string.letters[(_token_ct / 52) % 52] + \
+        string.letters[_token_ct % 52]
     _token_ct = _token_ct + 1
     if _token_ct > 140607:
         raise "We need to clean up tokenization code to support more users"
@@ -481,7 +504,8 @@ def merge_generators(l, key=lambda x: x):
     '''
     Perform a merge of generators, keeping order.
 
-    If inputs are sorted from greatest to least, output will be sorted likewise.
+    If inputs are sorted from greatest to least, output will be sorted
+    likewise.
 
     Possible uses:
     * Hadoop-style merge sort.
@@ -495,6 +519,7 @@ def merge_generators(l, key=lambda x: x):
     >>> c = sorted([random.randint(0, 50) for x in range(10)], reverse=True)
     >>> list(merge_generators([a, b, c])) == sorted(a + b + c, reverse=True)
     True
+
     '''
     l = map(iter, l)
 
@@ -510,17 +535,18 @@ def merge_generators(l, key=lambda x: x):
             return None
 
     def key_wrapper(a):
-        if a == None:
+        if a is None:
             return None
         else:
             return key(a[1])
 
     heads = [(i, l[i].next()) for i in range(len(l))]
 
-    while max(heads, key=key_wrapper)[1] != None:
+    while max(heads, key=key_wrapper)[1] is not None:
         item = max(heads, key=key_wrapper)
         yield item[1]
         heads[item[0]] = (item[0], next(l[item[0]]))
+
 
 def fields(d, separator="."):
     '''
@@ -536,6 +562,7 @@ def fields(d, separator="."):
         else:
             s.add(k)
     return s
+
 
 def flatten(d, separator="."):
     '''
@@ -553,6 +580,7 @@ def flatten(d, separator="."):
         else:
             nd[k] = d[k]
     return nd
+
 
 def snoop(data):
     for item in data:
