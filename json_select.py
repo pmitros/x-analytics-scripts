@@ -1,9 +1,9 @@
 '''
-Select items from json dictionary. 
+Select items from json dictionary.
 
 Items are passed in to stdin
 
-Fields to select are passed in on the commandline. 
+Fields to select are passed in on the commandline.
 
 Please note this script is likely to change syntax.
 '''

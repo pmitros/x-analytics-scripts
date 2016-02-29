@@ -104,7 +104,8 @@ def quick_sort_sets(data_source,
     # http://stackoverflow.com/questions/4851463/python-closure-write-to-variable-in-parent-scope
 
     if not key:
-        key = lambda x: x
+        def key(x):
+            x
 
     fg = file_generator(filesystem)
 

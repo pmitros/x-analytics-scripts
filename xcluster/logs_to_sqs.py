@@ -1,38 +1,56 @@
 '''
-Take a list of all edX tracking logs in an S3 bucket. 
+Take a list of all edX tracking logs in an S3 bucket.
 
 Dump that list to Amazon SQS for worker processes to pull from.
 
 Example:
 
-  python logs_to_sqs.py --bucket edx-analytics-source --prefix user-history/ --queue edx-sqs-worker-queue
+  python logs_to_sqs.py --bucket edx-analytics-source \
+                        --prefix user-history/ \
+                        --queue edx-sqs-worker-queue
 '''
 
+import sys
+import os
+import argparse
+
 import boto.sqs
-import xanalytics.settings
-import xanalytics.multiprocess
 from boto.sqs.message import Message
 from boto.s3.connection import S3Connection
 
-import sys, os
-import argparse
+from xanalytics.settings import settings
+import xanalytics.multiprocess
 
 parser = argparse.ArgumentParser(description='Send a set of files to SQS.')
-parser.add_argument('--bucket', dest='bucket', 
-                    default = xanalytics.settings.settings["tracking-logs-bucket"], help='Source bucket')
-parser.add_argument('--prefix', dest='prefix', 
-                    default = "logs/tracking", help='Bucket prefix')
-parser.add_argument('--queue', dest='queue', 
-                    default = xanalytics.settings.settings["tracking-logs-queue"], help='SWS queue')
-args = parser.parse_args()
+parser.add_argument(
+    '--bucket',
+    dest='bucket',
+    default=settings["tracking-logs-bucket"],
+    help='Source bucket'
+)
+parser.add_argument(
+    '--prefix',
+    dest='prefix',
+    default="logs/tracking",
+    help='Bucket prefix'
+)
+parser.add_argument(
+    '--queue',
+    dest='queue',
+    default=settings["tracking-logs-queue"],
+    help='SWS queue'
+)
 
-s3_conn = S3Connection(aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'], 
-                       aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
+args = parser.parse_args()
+s3_conn = S3Connection(aws_access_key_id=settings['edx-aws-access-key-id'],
+                       aws_secret_access_key=settings['edx-aws-secret-key'])
 bucket = s3_conn.get_bucket(args.bucket)
 
-sqs_conn = boto.sqs.connect_to_region("us-east-1", 
-                                      aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'], 
-                                      aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
+sqs_conn = boto.sqs.connect_to_region(
+    "us-east-1",
+    aws_access_key_id=settings['edx-aws-access-key-id'],
+    aws_secret_access_key=settings['edx-aws-secret-key']
+)
 
 source = bucket.list(prefix=args.prefix)
 source = xanalytics.multiprocess.split(source, 100)

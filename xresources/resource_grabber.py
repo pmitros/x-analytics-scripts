@@ -1,10 +1,14 @@
 '''
 This script will grab all edX problems from a Mongo database, and
 export them as individual files in a directory. This is *NOT TESTED
-WITH SPLIT MONGO*. It is likely to explode after this change. 
+WITH SPLIT MONGO*. It is likely to explode after this change.
 
-Run as: 
-  python resource_grabber.py username password problem mongodb://database.24.mongolayer.com:27107/my-clone-database") my-clone-database
+Run as:
+  python resource_grabber.py username \
+             password \
+             problem \
+             mongodb://database.24.mongolayer.com:27107/my-clone-database") \
+             my-clone-database
 
 Or:
   python problem
@@ -21,9 +25,10 @@ Used to be hardcoded to edX production servers.
 import argparse
 import json
 import sys
-from xanalytics import settings
 
 from pymongo import MongoClient
+
+from xanalytics import settings
 
 print settings.settings._settings
 print ("mongo-replica-url" in settings.settings)
@@ -37,7 +42,7 @@ if ("mongo-replica-url" in settings.settings) and len(sys.argv) < 3:
     db = settings.settings["mongo-replica-database"]
     resource_type = sys.argv[1]
 else:
-    parser = argparse.ArgumentParser(description = __doc__)
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("username")
     parser.add_argument("password")
     parser.add_argument("resource_type")
@@ -54,13 +59,15 @@ client = MongoClient(url)
 db = client[db]
 collection = db['modulestore']
 db.authenticate(username, password)
-c = collection.find({"_id.category":resource_type})
+c = collection.find({"_id.category": resource_type})
 for item in c:
     id = item['_id']
-    filename = resource_type+u"/"+(u"{tag}.{org}.{course}.{name}.{category}".format(**id).replace("/","_"))
+    id_template = u"{tag}.{org}.{course}.{name}.{category}"
+    id_string = id_template.format(**id).replace("/", "_")
+    filename = resource_type + u"/" + id_string
     d = item['definition']['data']
     md = json.dumps(item['metadata'])
-    if isinstance(d,dict) and 'data' in d:
+    if isinstance(d, dict) and 'data' in d:
         d = d['data']
     if not isinstance(d, basestring):
         d = json.dumps(d)
