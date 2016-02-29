@@ -1,4 +1,5 @@
-'''This is a system designed to sort pretty big files. It will:
+'''
+This is a system designed to sort pretty big files. It will:
 
 * Break up the file into little pieces, and sort those in
   memory
@@ -23,8 +24,6 @@ took longer than the first-pass sorting. A non-naive, blocked version
 ought to give an 8x performance boost, however.
 
 Progress indication would be kind of nice too.
-
-Right now, the key is NOT used correctly. This is a TODO.
 '''
 
 import fs.tempfs
