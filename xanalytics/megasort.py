@@ -94,25 +94,26 @@ def quick_sort_sets(data_source,
                     file_limit=1000,
                     ramsize=1000,
                     breakpoints=[],
-                    ram_requirements=lambda x:1):
+                    ram_requirements=lambda x: 1):
     """
     On a first pass, we break up the input into many small, sorted
     files. This is a helper which makes that first pass.
     """
     items = []
-    total_size = [0] # Hack for Python 2.x scoping rules
+    total_size = [0]  # Hack for Python 2.x scoping rules. See:
     # http://stackoverflow.com/questions/4851463/python-closure-write-to-variable-in-parent-scope
 
     if not key:
-        key = lambda x:x
+        key = lambda x: x
 
     fg = file_generator(filesystem)
+
     def init():
         del items[:]
         total_size[0] = 0
 
     def finalize():
-        items.sort(key=lambda x:x[0], cmp=cmp)
+        items.sort(key=lambda x: x[0], cmp=cmp)
         (filename, filepointer) = fg.next()
         filepointer.writelines(unicode("\t".join(line)+'\n') for line in items)
         filepointer.close()
@@ -134,7 +135,7 @@ def megasort(data_source,
              file_limit=1000,
              ramsize=1000,
              breakpoints=[],
-             ram_requirements=lambda x:1):
+             ram_requirements=lambda x: 1):
     """
     This allows us to sort big-ish data. We need a key to sort on.
 
@@ -153,8 +154,12 @@ def megasort(data_source,
 
     start_time = time.time()
 
-    # First, we make a bunch of small, internally-sorted files. Each line has a key, tab, then line.
-    file_iter = quick_sort_sets(data_source, #xanalytics.multiprocess.split(data_source, 16),
+    # First, we make a bunch of small, internally-sorted files. Each
+    # line has a key, tab, then line.
+    #
+    # To make parallel:
+    # Change data_source to xanalytics.multiprocess.split(data_source, 16)
+    file_iter = quick_sort_sets(data_source,
                                 filesystem,
                                 key,
                                 cmp,
@@ -170,11 +175,12 @@ def megasort(data_source,
     # Now, we merge these files.
     while True:
         # We grab the first bunch of files
-        working_files = list(itertools.islice(remaining_files, file_limit))#        files[:file_limit]
+        working_files = list(itertools.islice(remaining_files, file_limit))
         if len(working_files) < 2:
             break
         # We grab pointers to data from those files
-        working_filepointers = ((x.split('\t') for x in filesystem.open(fn)) for fn in working_files)
+        working_filepointers = ((x.split('\t') for x in filesystem.open(fn))
+                                for fn in working_files)
         # We merge them
         output = heapq.merge(*working_filepointers)
         # We make a new file, and dump the merged results there
@@ -204,11 +210,11 @@ def megasort(data_source,
         try:
             line = line.split('\t')[1]
         except:
-            print >> sys.stderr, "[",line,"]"
+            print >> sys.stderr, "[", line, "]"
             raise
         yield line.strip()
 
-if __name__=='__main__':
+if __name__ == '__main__':
     '''
     This is a simple test case which will do four rounds of merge sort
     in-memory. It confirms there are 10k items at the end, and that
@@ -239,9 +245,9 @@ if __name__=='__main__':
         # Baseline was 17 seconds
         # Using all 8 cores brought this up to 33 second, ironically
         # TempFS vs. in-memory made no big difference
-        #ITEM_COUNT = 1e6
-        #FILE_LIMIT = 1000
-        #RAM_SIZE = 1000
+        # ITEM_COUNT = 1e6
+        # FILE_LIMIT = 1000
+        # RAM_SIZE = 1000
 
     import fs.memoryfs
     filesystem = fs.memoryfs.MemoryFS()
@@ -258,7 +264,7 @@ if __name__=='__main__':
                         filesystem,
                         file_limit=FILE_LIMIT,
                         ramsize=RAM_SIZE,
-                        #key=lambda x:"".join(reversed(x)),
+                        # key=lambda x:"".join(reversed(x)),
                         breakpoints="1234567890abcdef")
 
     old_item = None
@@ -271,7 +277,7 @@ if __name__=='__main__':
         old_item = item
     if len(c)+1 != ITEM_COUNT:
         raise "We did not have the correct number of items"
-    if not reduce((lambda x,y: x and y), c):
+    if not reduce((lambda x, y: x and y), c):
         raise "Items were not in the correct order"
-    if reduce((lambda x,y: x or y), d):
+    if reduce((lambda x, y: x or y), d):
         raise "Possible duplicate item"

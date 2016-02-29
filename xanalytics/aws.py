@@ -128,9 +128,12 @@ def list_s3_bucket(bucket_key='tracking-logs-bucket', prefix="logs/tracking"):
         yield key.name.encode('utf-8')
 
 
-def get_hashed_files(name, prefixes, bucket_key='scratch-bucket', delete=False):
+def get_hashed_files(name,
+                     prefixes,
+                     bucket_key='scratch-bucket',
+                     delete=False):
     '''
-    Grab all files on AWS which were generated with streaming.short_hash().
+    Grab all files on AWS which were generated with `streaming.short_hash()`.
 
     This is helpful for Hadoop-style operations. Each server on a
     server farm can generate independent files with a hash of the key. The
@@ -145,7 +148,8 @@ def get_hashed_files(name, prefixes, bucket_key='scratch-bucket', delete=False):
     '/log/2/aaa', etc., if they exist, and return an iterator over all
     of the lines in those files.
 
-    If delete = True, it will delete those files once it is done with /all/ of them
+    If delete = True, it will delete those files once it is done with
+    /all/ of them
 
     '''
     s3_conn = S3Connection(
@@ -203,19 +207,37 @@ def wait_for_spot_instance_fulfillment(conn, request_ids):
         return [s.state
                 for s
                 in conn.get_all_spot_instance_requests(request_ids)]
-    while 'open' in request_state(): 
+
+    while 'open' in request_state():
         time.sleep(10)
         print request_state()
-    instance_ids = [r.instance_id for r in conn.get_all_spot_instance_requests([r.id for r in request_ids])]
-    instances = sum([list(r.instances) for r in conn.get_all_instances(instance_ids)], [])
+    instance_ids = [r.instance_id
+                    for r
+                    in conn.get_all_spot_instance_requests(
+                        [r.id for r in request_ids]
+                    )]
+    instances = sum(
+        [list(r.instances)
+         for r
+         in conn.get_all_instances(instance_ids)],
+        []
+    )
     ips = [i.ip_address for i in instances]
     return ips
 
 '''
 Example:
-
 l = list(list_s3_bucket('scratch-bucket', prefix=""))
-prefixes = list(set(["/".join(i.split('/')[:-1]) for i in l if 'forums' not in i and 'sample-data' not in i]))
-users = field_set(text_to_json(xanalytics.aws.get_files("aaa", prefixes)), "username")
-
+prefixes = list(
+  set(["/".join(i.split('/')[:-1])
+       for i
+       in l
+       if 'forums' not in i and 'sample-data' not in i
+  ]))
+users = field_set(
+  text_to_json(
+    xanalytics.aws.get_files("aaa", prefixes)
+  ),
+  "username"
+)
 '''

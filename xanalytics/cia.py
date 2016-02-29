@@ -30,6 +30,7 @@ def cursor():
     global c
     return c
 
+
 def available_fields():
     return [x.split(' ')[0] for x in header.split(",")]
 
@@ -47,7 +48,11 @@ def utf_8_encoder(unicode_csv_data):
 languages = dict(x.split('\t')
                  for x
                  in settings.publicdatafs(compress=False).open("languages.csv"))
-data = csv.reader(utf_8_encoder(settings.publicdatafs(compress=False).open("cia-data-all.csv")))
+data = csv.reader(
+    utf_8_encoder(
+        settings.publicdatafs(compress=False).open("cia-data-all.csv")
+    )
+)
 rownum = 0
 memdata = []
 
