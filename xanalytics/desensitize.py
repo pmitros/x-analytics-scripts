@@ -41,12 +41,18 @@ from xanalytics.gzipfs import GZIPFS
 from streaming import *
 from xevents import decode_event, remove_redundant_data, desensitize_data
 
-parser = argparse.ArgumentParser(description='Desensitize (but not anonymize) and clean edX data.')
+parser = argparse.ArgumentParser(
+    description='Desensitize (but not anonymize) and clean edX data.'
+)
 parser.add_argument("input", help="Input directory")
 parser.add_argument("output", help="Output directory")
 parser.add_argument("--mindate", help="Date cutoff", default=None)
-parser.add_argument("--informat", help="input format (JSON or BSON)", default="json")
-parser.add_argument("--outformat", help="output format (JSON or BSON)", default="bson")
+parser.add_argument("--informat",
+                    help="input format (JSON or BSON)",
+                    default="json")
+parser.add_argument("--outformat",
+                    help="output format (JSON or BSON)",
+                    default="bson")
 args = parser.parse_args()
 
 print "Reading from ", args.input

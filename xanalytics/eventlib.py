@@ -4,11 +4,11 @@ WIP: Library for extracting information from events
 
 def source_institution(item):
     '''
-    Figure out the source institution for an event. 
+    Figure out the source institution for an event.
 
-    For now, we raise an exception when we fail. In the future, we'll do something smarter. 
+    For now, we raise an exception when we fail. In the future, we'll do something smarter.
 
-    This code is taken from a random one-off script. It needs to be cleaned up to be useful. 
+    This code is taken from a random one-off script. It needs to be cleaned up to be useful.
     '''
     try:
         jitem = json.loads(item)
@@ -24,22 +24,22 @@ def source_institution(item):
                 #save_problem_check, save_problem_check_fail, save_problem_fail
                 # All four of these have a problem_id, which we
                 # extract from
-                try: 
+                try:
                     return jitem['event']['problem_id'].split('/')[2]
-                except: 
+                except:
                     return "Unhandled"
         elif jitem['event_source'] == 'browser': # Caught in browser
             page = jitem['page']
             if 'courses' in page:
                 institution = page.split('/')[4]
                 return institution
-            else: 
-                ## Code path unchecked/non-course has no 
+            else:
+                ## Code path unchecked/non-course has no
                 ## instrumentation
                 return "BGE"
-    except ValueError: ## TODO: 
+    except ValueError: ## TODO:
         raise
-    except: 
+    except:
         raise
 
 
@@ -47,7 +47,7 @@ def date_string(item):
     '''
     Grab the data from an item.
     '''
-    try: 
+    try:
         return json.loads(item)['time'].split("T")[0]
-    except: 
+    except:
         return "XX"

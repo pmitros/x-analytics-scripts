@@ -7,12 +7,12 @@
 
 This will not run out of file pointers, memory, or have similar issues
 often associated with pretty big data. However, it's not parallel, or
-distributed, so it will not scale to very big files. 
+distributed, so it will not scale to very big files.
 
 It's not a bad starting point for a cluster sort like that. The steps
 would be:
 * Distribute the initial sort across the cluster
-* Have machines on the cluster do the merge pass for groups of files, 
+* Have machines on the cluster do the merge pass for groups of files,
   but merge into several files, with fixed break points
 * Have machines do a final merge on those files
 
@@ -38,6 +38,7 @@ import uuid
 import xanalytics.multiprocess
 
 from xanalytics.streaming import snoop
+
 
 def filename_generator():
     '''
@@ -75,6 +76,7 @@ def filename_generator():
         yield "tmp-{i}-{base}".format(i=i, base=base)
         i = i+1
 
+
 def file_generator(filesystem):
     '''
     Returns an iterator of temporary files. Returns pairs of filenames
@@ -83,6 +85,7 @@ def file_generator(filesystem):
     fg = filename_generator()
     for filename in fg:
         yield (filename, filesystem.open(filename, "w"))
+
 
 def quick_sort_sets(data_source,
                     filesystem=fs.tempfs.TempFS(),
@@ -123,6 +126,7 @@ def quick_sort_sets(data_source,
             init()
     yield finalize()
 
+
 def megasort(data_source,
              filesystem=fs.tempfs.TempFS(),
              key=None,
@@ -134,10 +138,10 @@ def megasort(data_source,
     """
     This allows us to sort big-ish data. We need a key to sort on.
 
-    Algorithm: 
+    Algorithm:
 
     Step through data. Pick out blocks of size `ramsize`. Sort them. Write
-    them to disk. If we want to be more nuanced, we can assign a size 
+    them to disk. If we want to be more nuanced, we can assign a size
 
     Open up `file_limit` files. Merge them. Delete the originals.
 
@@ -163,7 +167,7 @@ def megasort(data_source,
 
     fg = file_generator(filesystem)
 
-    # Now, we merge these files. 
+    # Now, we merge these files.
     while True:
         # We grab the first bunch of files
         working_files = list(itertools.islice(remaining_files, file_limit))#        files[:file_limit]

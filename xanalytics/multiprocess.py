@@ -10,33 +10,45 @@ cases. Although it would be possible to phrase some types of
 accumulations as a split()/accumulate/join()/accumulate.
 '''
 
-from multiprocessing import Queue
-import os, sys, itertools, time
-
+import itertools
+import os
 import sentinel
+import sys
+import time
+
+from multiprocessing import Queue
+
 
 _pid = None
-_qout = Queue(maxsize = 1000)
+_qout = Queue(maxsize=1000)
 _processes = 0
 
 EndOfQueue = "End of queue"
 FeederThread = sentinel.create('FeederThread')
 ConsumerThread = sentinel.create('ConsumerThread')
 
+
 def log(task, item):
     if False:
-        print "[{pid}] [{task}]: {item}".format(pid = _pid, task = task, item = item)
+        print "[{pid}] [{task}]: {item}".format(pid=_pid,
+                                                task=task,
+                                                item=item)
+
 
 def split(data, processes):
     '''
-    Fork off a number of processes. The data processing will be split among those processes.
+    Fork off a number of processes. The data processing will be split
+    among those processes.
 
-    The data goes into a queue. Processes pick of data from the queue until the queue is exhausted.
+    The data goes into a queue. Processes pick of data from the queue
+    until the queue is exhausted.
 
     processes is the number of processes to start.
+
     '''
     global _pid, _qout, _processes
     _processes = processes
+
     def forker():
         for i in range(processes):
             process = os.fork()
@@ -50,9 +62,8 @@ def split(data, processes):
     qin = Queue(maxsize=1000)
 
     _pid = forker()
-    #print "pid", _pid
 
-    ## Feeder process
+    # Feeder process
     if _pid == FeederThread:
         for d in data:
             qin.put(d, block=True)
@@ -64,19 +75,17 @@ def split(data, processes):
     elif _pid == ConsumerThread:
         return []
     else:
-        return iter(lambda : qin.get(block=True), EndOfQueue)
+        return iter(lambda: qin.get(block=True), EndOfQueue)
+
 
 def join(data):
     def pull_data():
-        #print "Attempting PULL"
         d = _qout.get(block=True)
         log("PULL", d)
         return d
 
     if _pid == ConsumerThread:
-        #print "Iterables"
         iterables = [iter(pull_data, EndOfQueue) for x in range(_processes+1)]
-        #print "Done iterables"
         return itertools.chain(*iterables)
 
     for d in data:
@@ -89,6 +98,7 @@ def join(data):
     os._exit(0)
     return []
 
+
 if __name__ == '__main__':
     data = split(range(100), 8)
 
@@ -99,6 +109,6 @@ if __name__ == '__main__':
 
     data = compute(data)
     data = join(data)
-    data= list(data)
+    data = list(data)
     print len(data)
     print data

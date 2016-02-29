@@ -1,5 +1,9 @@
-''' Import CIA World Factbook into an in-memory database. 
-Extract and output country codes for all countries with per-capita GDP of less than 3000
+'''
+Import CIA World Factbook into an in-memory database.
+
+Also:
+* Extract and output country codes for all countries with per-capita GDP
+  of less than 3000
 '''
 
 import csv
@@ -8,11 +12,16 @@ import sqlite3
 import unicodedata
 import settings
 
+from cia_schema import float_columns, int_columns, dollar_columns, not_nations
+
 conn = sqlite3.connect(":memory:")
 conn.text_factory = str
 c = conn.cursor()
 
-### Public API
+##############
+# Public API #
+##############
+
 
 def cursor():
     '''
@@ -24,21 +33,24 @@ def cursor():
 def available_fields():
     return [x.split(' ')[0] for x in header.split(",")]
 
-
-### Private
-
+###########
+# Private #
+###########
 header = None
+
 
 def utf_8_encoder(unicode_csv_data):
     for line in unicode_csv_data:
         yield line.encode('utf-8')
 
-languages = dict(x.split('\t') for x in settings.publicdatafs(compress=False).open("languages.csv"))
 
-
+languages = dict(x.split('\t')
+                 for x
+                 in settings.publicdatafs(compress=False).open("languages.csv"))
 data = csv.reader(utf_8_encoder(settings.publicdatafs(compress=False).open("cia-data-all.csv")))
 rownum = 0
 memdata = []
+
 
 def clean_header(s):
     s = s.strip()
@@ -50,22 +62,26 @@ def clean_header(s):
     s = s.strip('_')
     return s
 
+
 def identity_parser(c):
     return c
 
+
 def dollar_parser(c):
-    c = c.replace('$','')
-    c = c.replace(' ','')
+    c = c.replace('$', '')
+    c = c.replace(' ', '')
     c = c.strip()
     if len(c) > 0:
         return int(c)
     else:
         return None
 
+
 def float_parser(c):
     if len(c)>0:
         return float(c)
     return None
+
 
 def int_parser(c):
     if len(c)>0:
@@ -74,43 +90,22 @@ def int_parser(c):
 
 column_info = {}
 
-int_columns = ["Labor_force", "Waterways", "HIV_AIDS_people_living_with_HIV_AIDS", "HIV_AIDS_deaths",
-               "Telephones_main_lines_in_use", "Internet_users", "Area", "Natural_gas_production", "Roadways", "Railways", 
-               "Natural_gas_exports", "Natural_gas_imports", "Natural_gas_consumption", "Oil_production", "Electricity_production"]
-float_columns = ["Land_use", "Land_boundaries", "Infant_mortality_rate", "Inflation_rate_consumer_prices", "HIV_AIDS_adult_prevalence_rate", 
-                 "Sex_ratio", "Television_broadcast_stations", "Age_structure", "Radio_broadcast_stations", "Irrigated_land", "Coastline", 
-                 "Languages", "Heliports", "GDP_real_growth_rate", "Population_growth_rate", "Unemployment_rate", "Total_fertility_rate", 
-                 "Industrial_production_growth_rate", "Suffrage", "Airports_with_paved_runways", "Airports_with_unpaved_runways", "Military_expenditures",
-                 "Median_age", "Distribution_of_family_income_Gini_index", "Manpower_reaching_militarily_significant_age_annually", "Imports_partners",
-                 "GDP_composition_by_sector", "Electricity_exports", "Labor_force_by_occupation", "Commercial_bank_prime_lending_rate", "Pipelines",
-                 "Death_rate", "Total_renewable_water_resources", "Freshwater_withdrawal_domestic_industrial_agricultural", "Birth_rate", 
-                 "Education_expenditures", 'Exchange_rates', 'Ethnic_groups', 'Exports_partners', 'School_life_expectancy_primary_to_tertiary_education', 
-                 'Population_below_poverty_line', 'Household_income_or_consumption_by_percentage_share', 'Net_migration_rate', 'Religions', 
-                 'Electricity_imports', 'Urbanization', 'Manpower_fit_for_military_service', 'Elevation_extremes', 'Literacy', 'Life_expectancy_at_birth', 
-                 'Maritime_claims', 'Manpower_available_for_military_service']
-
-dollar_columns = ["GDP_per_capita_PPP", "GDP_purchasing_power_parity", "Imports", "Stock_of_direct_foreign_investment_abroad", 
-                  "Stock_of_direct_foreign_investment_at_home", "GDP_official_exchange_rate", "Market_value_of_publicly_traded_shares", 
-                  "Exports", "Debt_external", 'Budget', 'Current_account_balance', 'Stock_of_domestic_credit', 'Oil_exports', 'Oil_consumption', 
-                  'Oil_imports', 'Oil_proved_reserves', 'Natural_gas_proved_reserves', 'Airports', 'Electricity_consumption', 'Population', 
-                  'Telephones_mobile_cellular', 'Public_debt', 'Investment_gross_fixed', 'Internet_hosts', 'Reserves_of_foreign_exchange_and_gold', 
-                  'Military_service_age_and_obligation', 'Merchant_marine']
-
 for column in int_columns:
-    column_info[column] = {'parser':int_parser, 
-                           'type':'int'}
+    column_info[column] = {'parser': int_parser,
+                           'type': 'int'}
 for column in float_columns:
-    column_info[column] = {'parser':float_parser, 
-                           'type':'float'}
+    column_info[column] = {'parser': float_parser,
+                           'type': 'float'}
 for column in dollar_columns:
-    column_info[column] = {'parser':dollar_parser, 
-                           'type':'int'}
+    column_info[column] = {'parser': dollar_parser,
+                           'type': 'int'}
 
 
 def headertype(c):
     if c in column_info:
         return column_info[c]['type']
     return "text"
+
 
 def parsertype(c):
     if c in column_info:
@@ -119,7 +114,7 @@ def parsertype(c):
 
 for row in data:
     # Skip things which aren't really nations
-    if row[0] in ['United States Pacific Island Wildlife Refuges', 'Ashmore and Cartier Islands', 'Atlantic Ocean', 'Pacific Ocean', 'Jan Mayen', 'Southern Ocean', 'Heard Island and McDonald Islands', 'Coral Sea Islands', 'South Georgia and the South Sandwich Islands', 'Error in running event chain: Error occurred while trying to run the event chain.', 'Indian Ocean', 'Navassa Island', 'Spratly Islands', 'Netherlands Antilles', 'Paracel Islands', 'Wake Island', 'Bouvet Island', 'Clipperton Island', 'Mayotte', 'British Indian Ocean Territory', 'Arctic Ocean', 'French Southern and Antarctic Lands', 'Antarctica']:
+    if row[0] in not_nations:
         continue
 
     if rownum == 0:
@@ -131,7 +126,7 @@ for row in data:
         c.execute(command)
         commas = ",".join(["?"]*(len(row)+1))
         insert_command = 'INSERT INTO cia VALUES ({commas})'.format(commas=commas)
-    else: 
+    else:
         parsed_row = [p(r) for p,r in zip(parsers, row)]
         parsed_row.append(languages[row[0]])
         c.executemany(insert_command, [parsed_row])
@@ -143,7 +138,7 @@ if __name__ == '__main__':
 
     for row in c.execute('SELECT Internet_country_code, Languages from cia where GDP_per_capita_PPP < 3000'):
         cc = row[0]
-        if len(cc) < 1: 
+        if len(cc) < 1:
             continue
         countries.append(cc[1:3])
 

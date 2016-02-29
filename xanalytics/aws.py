@@ -21,8 +21,7 @@ import boto.sqs
 from boto.sqs.message import Message
 from boto.s3.connection import S3Connection
 
-
-import xanalytics.settings
+from xanalytics.settings import settings
 
 
 def sqs_s3_deque_lines():
@@ -38,13 +37,17 @@ def sqs_s3_deque_lines():
     We do boto imports locally since this file otherwise does not rely
     on AWS.
     '''
-    s3_conn = S3Connection(aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'],
-                           aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
-    sqs_conn = boto.sqs.connect_to_region("us-east-1",
-                                          aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'],
-                                          aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
+    s3_conn = S3Connection(
+        aws_access_key_id=settings['edx-aws-access-key-id'],
+        aws_secret_access_key=settings['edx-aws-secret-key']
+    )
+    sqs_conn = boto.sqs.connect_to_region(
+        "us-east-1",
+        aws_access_key_id=settings['edx-aws-access-key-id'],
+        aws_secret_access_key=settings['edx-aws-secret-key']
+    )
 
-    q = sqs_conn.get_queue(xanalytics.settings.settings["tracking-logs-queue"])
+    q = sqs_conn.get_queue(settings["tracking-logs-queue"])
     file_count = 0
     total_bytes = 0
     while q.count() > 0:
@@ -53,7 +56,7 @@ def sqs_s3_deque_lines():
         file_count = file_count + 1
         print item
 
-        source_bucket = s3_conn.get_bucket(xanalytics.settings.settings['tracking-logs-bucket'])
+        source_bucket = s3_conn.get_bucket(settings['tracking-logs-bucket'])
         key = source_bucket.get_key(item)
         filename = "/tmp/log_" + uuid.uuid1().hex + ".log"
         key.get_contents_to_filename(filename)
@@ -89,10 +92,12 @@ def sqs_enque(data):
 
     (Untested)
     '''
-    sqs_conn = boto.sqs.connect_to_region("us-east-1",
-                                          aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'],
-                                          aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
-    q = sqs_conn.get_queue(xanalytics.settings.settings["tracking-logs-queue"])
+    sqs_conn = boto.sqs.connect_to_region(
+        "us-east-1",
+        aws_access_key_id=settings['edx-aws-access-key-id'],
+        aws_secret_access_key=settings['edx-aws-secret-key']
+    )
+    q = sqs_conn.get_queue(settings["tracking-logs-queue"])
 
     for item in data:
         m = Message()
@@ -104,14 +109,18 @@ def list_s3_bucket(bucket_key='tracking-logs-bucket', prefix="logs/tracking"):
     '''
     yield a list of all files that start with a given prefix.
     '''
-    s3_conn = S3Connection(aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'],
-                           aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
-    bucket = s3_conn.get_bucket(xanalytics.settings.settings[bucket_key])
+    s3_conn = S3Connection(
+        aws_access_key_id=settings['edx-aws-access-key-id'],
+        aws_secret_access_key=settings['edx-aws-secret-key']
+    )
+    bucket = s3_conn.get_bucket(settings[bucket_key])
 
-    sqs_conn = boto.sqs.connect_to_region("us-east-1",
-                                          aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'],
-                                          aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
-    q = sqs_conn.get_queue(xanalytics.settings.settings["tracking-logs-queue"])
+    sqs_conn = boto.sqs.connect_to_region(
+        "us-east-1",
+        aws_access_key_id=settings['edx-aws-access-key-id'],
+        aws_secret_access_key=settings['edx-aws-secret-key']
+    )
+    q = sqs_conn.get_queue(settings["tracking-logs-queue"])
 
     for key in bucket.list():
         if not key.name.startswith(prefix):
@@ -139,9 +148,11 @@ def get_hashed_files(name, prefixes, bucket_key='scratch-bucket', delete=False):
     If delete = True, it will delete those files once it is done with /all/ of them
 
     '''
-    s3_conn = S3Connection(aws_access_key_id=xanalytics.settings.settings['edx-aws-access-key-id'],
-                           aws_secret_access_key=xanalytics.settings.settings['edx-aws-secret-key'])
-    bucket = s3_conn.get_bucket(xanalytics.settings.settings[bucket_key])
+    s3_conn = S3Connection(
+        aws_access_key_id=settings['edx-aws-access-key-id'],
+        aws_secret_access_key=settings['edx-aws-secret-key']
+    )
+    bucket = s3_conn.get_bucket(settings[bucket_key])
 
     good_keys = list()
 
@@ -174,19 +185,27 @@ def wait_for_spot_instance_fulfillment(conn, request_ids):
     """
     Wait until request for AWS spot instances have been fulfilled.
 
-    Loop through all pending request ids waiting for them to be fulfilled.
-    If there are still pending requests, sleep and check again in 10 seconds.
-    Only return when all spot requests have been fulfilled.
+    Loop through all pending request ids waiting for them to be
+    fulfilled.  If there are still pending requests, sleep and check
+    again in 10 seconds.  Only return when all spot requests have been
+    fulfilled.
 
     This is a bad idea for automated tasks as-is. AWS can choose to,
-    for example, fill five requests, and hold off on one. In such a case,
-    this won't return (since not all have been fulfilled), but you'll still
-    be paying for the instances which were. Using spot instances in automated
-    tasks requires a lot more in terms of timeouts, error-handling logic, etc.
+    for example, fill five requests, and hold off on one. In such a
+    case, this won't return (since not all have been fulfilled), but
+    you'll still be paying for the instances which were. Using spot
+    instances in automated tasks requires a lot more in terms of
+    timeouts, error-handling logic, etc.
+
     """
-    while 'open' in [s.state for s in conn.get_all_spot_instance_requests([r.id for r in request_ids])]:
+    def request_state():
+        request_ids = [r.id for r in request_ids]
+        return [s.state
+                for s
+                in conn.get_all_spot_instance_requests(request_ids)]
+    while 'open' in request_state(): 
         time.sleep(10)
-        print [s.state for s in conn.get_all_spot_instance_requests([r.id for r in request_ids])]
+        print request_state()
     instance_ids = [r.instance_id for r in conn.get_all_spot_instance_requests([r.id for r in request_ids])]
     instances = sum([list(r.instances) for r in conn.get_all_instances(instance_ids)], [])
     ips = [i.ip_address for i in instances]

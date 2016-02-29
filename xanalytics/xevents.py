@@ -5,7 +5,7 @@ edX JSON events.
 
 import json
 import numbers
-
+import sys
 
 from xanalytics.streaming import token, __select_field
 
@@ -28,8 +28,9 @@ def decode_browser_event(data):
             except ValueError:
                 line['event'] = 'Truncated'
             yield line
-        else:  ## Should never happen
-            yield line    
+        else:  # Should never happen
+            print >> sys.stderr, "Line without an event"
+            yield line
 
 
 def desensitize_data(data, sensitive_fields, sensitive_event_fields):
@@ -37,7 +38,7 @@ def desensitize_data(data, sensitive_fields, sensitive_event_fields):
     Remove known-sensitive fields and replace usernames with tokens.
 
     This does not fully deidentify data. It is helpful, however, for
-    preventing a range of simple slip-ups in data handling. By 
+    preventing a range of simple slip-ups in data handling. By
     replacing simple PII, it's a lot harder to e.g. run into the
     name of someone we know while processing data.
 

@@ -16,6 +16,7 @@ import xanalytics.megasort as megasort
 import xanalytics.streaming as streaming
 import xanalytics.xevents as xevents
 
+
 def key(sample):
     sample = json.loads(sample)
     return sample.get("username", "")+' '+sample.get("time", "")
