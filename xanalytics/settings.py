@@ -10,6 +10,30 @@ settings_files = ['/etc/xanalytics', '~/.xanalytics']
 
 
 class _settings(object):
+    '''
+    This is an object which will read settings from one or more files
+    on disk, and combine them in order. Right now, these files are
+    `/etc/xanalytics` and `~/.xanalytics`. Settings can also be
+    overridden, which is helpful for things like commandline
+    parameters, as well as patching for test cases. The logic for
+    overrides is as follows:
+
+    >>> initial_max = settings.get("max-file-size")
+    >>> settings.push_overrides({'max-file-size': 5})
+    >>> settings['max-file-size']
+    5
+    >>> settings.push_overrides({'max-file-size': 10})
+    >>> settings['max-file-size']
+    10
+    >>> settings.pop_overrides()
+    {'max-file-size': 10}
+    >>> settings['max-file-size']
+    5
+    >>> settings.pop_overrides()
+    {'max-file-size': 5}
+    >>> settings['max-file-size'] == initial_max
+    True
+    '''
     _settings = None
 
     _settings_overrides = []
@@ -91,16 +115,7 @@ def publicdatafs(namespace=False, compress=True):
 def edxdatafs(namespace=False, compress=True):
     return _fslookup(namespace, 'edx-data-dir', compress)
 
-if __name__ == '__main__':
-    '''
-    Test that settings overrides work
-    '''
-    initial_max = settings.get("max-file-size")
-    settings.push_overrides({'max-file-size': 5})
-    print settings['max-file-size'] == 5
-    settings.push_overrides({'max-file-size': 10})
-    print settings['max-file-size'] == 10
-    print settings.pop_overrides() == {'max-file-size': 10}
-    print settings['max-file-size'] == 5
-    print settings.pop_overrides() == {'max-file-size': 5}
-    print settings['max-file-size'] == initial_max
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
