@@ -41,33 +41,34 @@ from xanalytics.gzipfs import GZIPFS
 from streaming import *
 from xevents import decode_event, remove_redundant_data, desensitize_data
 
-parser = argparse.ArgumentParser(
-    description='Desensitize (but not anonymize) and clean edX data.'
-)
-parser.add_argument("input", help="Input directory")
-parser.add_argument("output", help="Output directory")
-parser.add_argument("--mindate", help="Date cutoff", default=None)
-parser.add_argument("--informat",
-                    help="input format (JSON or BSON)",
-                    default="json")
-parser.add_argument("--outformat",
-                    help="output format (JSON or BSON)",
-                    default="bson")
-args = parser.parse_args()
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description='Desensitize (but not anonymize) and clean edX data.'
+    )
+    parser.add_argument("input", help="Input directory")
+    parser.add_argument("output", help="Output directory")
+    parser.add_argument("--mindate", help="Date cutoff", default=None)
+    parser.add_argument("--informat",
+                        help="input format (JSON or BSON)",
+                        default="json")
+    parser.add_argument("--outformat",
+                        help="output format (JSON or BSON)",
+                        default="bson")
+    args = parser.parse_args()
 
-print "Reading from ", args.input
-print "Writing to ", args.output
+    print "Reading from ", args.input
+    print "Writing to ", args.output
 
-infs = GZIPFS(args.input)
-outfs = GZIPFS(args.output)
+    infs = GZIPFS(args.input)
+    outfs = GZIPFS(args.output)
 
-data = read_data(infs, format=args.informat)
-if args.mindate:
-    data = date_gt_filter(data, args.mindate)
-data = decode_event(data)
-data = remove_redundant_data(data)
-data = desensitize_data(data,
-                        ['agent', 'ip', 'host', 'user_id', "session"],
-                        ["csrfmiddlewaretoken", "session"])
-data = json_to_text(data)
-save_data(data, args.output)  # TODO:, format=args.outformat)
+    data = read_data(infs, format=args.informat)
+    if args.mindate:
+        data = date_gt_filter(data, args.mindate)
+        data = decode_event(data)
+        data = remove_redundant_data(data)
+        data = desensitize_data(data,
+                                ['agent', 'ip', 'host', 'user_id', "session"],
+                                ["csrfmiddlewaretoken", "session"])
+        data = json_to_text(data)
+        save_data(data, args.output)  # TODO:, format=args.outformat)

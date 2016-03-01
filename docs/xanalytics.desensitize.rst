@@ -1,2 +1,1 @@
-.. automodule:: xanalytics.desensitize
-    :members:
+A small script to remove PII from data.

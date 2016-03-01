@@ -1,5 +1,12 @@
 '''
-The eventual goal is to have per-user sorted stack traces.
+This is a small script which will pull lines out log files, via
+Amazon SQS, and write them into files sharded based on user id.
+
+This was part of a workflow to reorganize data on a per-user
+basis so we could have learner traces. This might be a little
+obsolete right now -- for the most part, we can do this with
+megasort. But it is a nice demo of how to do Python Hadoop-like
+operations on AWS easily with the framework.
 '''
 
 
@@ -14,16 +21,17 @@ from xanalytics.streaming import *
 from boto.sqs.message import Message
 from boto.s3.connection import S3Connection
 
-s3_conn = S3Connection(
-    aws_access_key_id=settings['edx-aws-access-key-id'],
-    aws_secret_access_key=settings['edx-aws-secret-key']
-)
+if __name__ == '__main__':
+    s3_conn = S3Connection(
+        aws_access_key_id=settings['edx-aws-access-key-id'],
+        aws_secret_access_key=settings['edx-aws-secret-key']
+    )
 
-filebase = "/mnt/log/"+str(os.getpid())+"-"+platform.node()
-if not os.path.exists(filebase):
-    os.makedirs(filebase)
+    filebase = "/mnt/log/"+str(os.getpid())+"-"+platform.node()
+    if not os.path.exists(filebase):
+        os.makedirs(filebase)
 
-files = {}
+    files = {}
 
 
 def sqs_lines():
@@ -69,20 +77,21 @@ def sqs_lines():
         os.unlink(filename)
 
 
-data = sqs_lines()
-data = text_to_json(data)
-data = remove_redundant_data(data)
-data = truncate_json(data, 200)
+if __name__ == '__main__':
+    data = sqs_lines()
+    data = text_to_json(data)
+    data = remove_redundant_data(data)
+    data = truncate_json(data, 200)
 
-files = {}
+    files = {}
 
-for item in data:
-    user = item.get("username", "___NONE___")
-    hash = short_hash(user)
-    if hash not in files:
-        files[hash] = gzip.open(filebase+'/'+hash, "w")
-    files[hash].write(json.dumps(item, sort_keys=True))
-    files[hash].write('\n')
+    for item in data:
+        user = item.get("username", "___NONE___")
+        hash = short_hash(user)
+        if hash not in files:
+            files[hash] = gzip.open(filebase+'/'+hash, "w")
+        files[hash].write(json.dumps(item, sort_keys=True))
+        files[hash].write('\n')
 
-for file in files:
-    files[file].close()
+    for file in files:
+        files[file].close()

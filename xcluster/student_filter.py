@@ -22,15 +22,16 @@ from xanalytics.settings import settings
 from boto.sqs.message import Message
 from boto.s3.connection import S3Connection
 
-s3_conn = S3Connection(
-    aws_access_key_id=settings['edx-aws-access-key-id'],
-    aws_secret_access_key=settings['edx-aws-secret-key']
-)
-temp = uuid.uuid1().hex
+if __name__ == '__main__':
+    s3_conn = S3Connection(
+        aws_access_key_id=settings['edx-aws-access-key-id'],
+        aws_secret_access_key=settings['edx-aws-secret-key']
+    )
+    temp = uuid.uuid1().hex
 
-users = [x.strip()
-         for x
-         in open("/tmp/cluster/cluster/forum_run/user_list.txt")]
+    users = [x.strip()
+             for x
+             in open("/tmp/cluster/cluster/forum_run/user_list.txt")]
 
 
 def process(item):
@@ -59,21 +60,22 @@ def process(item):
     os.unlink(filename)
     return key.size
 
-i = 0
-d = 0
+if __name__ == '__main__':
+    i = 0
+    d = 0
 
-sqs_conn = boto.sqs.connect_to_region(
-    "us-east-1",
-    aws_access_key_id=settings['edx-aws-access-key-id'],
-    aws_secret_access_key=settings['edx-aws-secret-key']
-)
-q = sqs_conn.get_queue(settings["tracking-logs-queue"])
-while q.count() > 0:
-    m = q.read(60*10)
-    b = m.get_body()
-    i = i+1
-    print b
-    s = process(b)
-    d = d + s
-    print i, "files", b, d/1.e9, "GB"
-    q.delete_message(m)
+    sqs_conn = boto.sqs.connect_to_region(
+        "us-east-1",
+        aws_access_key_id=settings['edx-aws-access-key-id'],
+        aws_secret_access_key=settings['edx-aws-secret-key']
+    )
+    q = sqs_conn.get_queue(settings["tracking-logs-queue"])
+    while q.count() > 0:
+        m = q.read(60*10)
+        b = m.get_body()
+        i = i+1
+        print b
+        s = process(b)
+        d = d + s
+        print i, "files", b, d/1.e9, "GB"
+        q.delete_message(m)
