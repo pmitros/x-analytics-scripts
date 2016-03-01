@@ -8,7 +8,7 @@ In order to use these scripts, create a YAML file in your home
 directory called `~/.xanalytics`. This file should define several
 directories:
 
-- `public-data-dir`     -- Non-edX datafiles. Geocoding. CIA World Factbook. Etc.
+- `public-data-dir`     -- Obsolete: Non-edX datafiles. Geocoding. CIA World Factbook. Etc. This is not in the package itself.
 - `edx-data-dir`        -- edX tracking logs and other read-only source data with PII
 - `scratch-dir`         -- Location for intermediate data. 
 

@@ -1,4 +1,5 @@
 import os.path
+import pkg_resources
 import yaml
 
 import fs.osfs
@@ -79,7 +80,12 @@ def scratchfs(namespace=False, compress=True):
 
 
 def publicdatafs(namespace=False, compress=True):
-    return _fslookup(namespace, 'public-data-dir', compress)
+    public_data_dir = pkg_resources.resource_filename(
+        'xanalytics',
+        'public_data'
+    )
+    return fs.osfs.OSFS(public_data_dir)
+    #return _fslookup(namespace, 'public-data-dir', compress)
 
 
 def edxdatafs(namespace=False, compress=True):

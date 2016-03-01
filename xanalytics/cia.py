@@ -25,13 +25,17 @@ c = conn.cursor()
 
 def cursor():
     '''
-    Return a cursor to the CIA World Factbook database
+    Return a cursor to the CIA World Factbook database. This is a
+    sqlite in-memory database.
     '''
     global c
     return c
 
 
 def available_fields():
+    '''
+    Return a list of columns in the database.
+    '''
     return [x.split(' ')[0] for x in header.split(",")]
 
 ###########
@@ -41,10 +45,13 @@ header = None
 
 
 def utf_8_encoder(unicode_csv_data):
+    '''
+    Stream processing operator going to UTF-8
+    '''
     for line in unicode_csv_data:
         yield line.encode('utf-8')
 
-public_fs = settings.publicdatafs(compress=False).
+public_fs = settings.publicdatafs(compress=False)
 languages = dict(x.split('\t')
                  for x
                  in public_fs.open("languages.csv"))
@@ -58,6 +65,11 @@ memdata = []
 
 
 def clean_header(s):
+    '''
+    Convert headers into something friendly for SQL, JSON, YAML,
+    filenames, etc. by replacing all non-alphanumeric characters with
+    underscores.
+    '''
     s = s.strip()
     for i in range(len(s)):
         if not s[i].isalnum():
@@ -69,10 +81,16 @@ def clean_header(s):
 
 
 def identity_parser(c):
+    '''
+    nop. Return the string passed in.
+    '''
     return c
 
 
 def dollar_parser(c):
+    '''
+    Convert dollars to an int.
+    '''
     c = c.replace('$', '')
     c = c.replace(' ', '')
     c = c.strip()
@@ -121,6 +139,12 @@ def headertype(c):
 
 
 def parsertype(c):
+    '''
+    Take the name of a column. Return a function which will parse that
+    column into a native format. For example, given a column like
+    population, it would return a function which would return a native
+    python `int` given a string of the country's population.
+    '''
     if c in column_info:
         return column_info[c]['parser']
     return identity_parser
@@ -131,7 +155,6 @@ for row in data:
         continue
 
     if rownum == 0:
-        global header
         row = [clean_header(r) for r in row]
         parsers = [parsertype(r) for r in row]
         header = ",".join((c+" "+headertype(c) for c in row))+",language_list"
