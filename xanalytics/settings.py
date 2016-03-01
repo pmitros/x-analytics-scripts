@@ -1,3 +1,14 @@
+'''
+This manages the configuration management for the X Analytics
+Scripts. It has several functions:
+
+* Read and merge configuration files ('/etc/xanalytics', '~/.xanalytics')
+* Allow settings to be overridden in specifc settings
+* Abstract away how files are managed into a pyfilesystem object. This
+  becomes helpful when moving to S3, or cluster computing, or compressed
+  files, especially.
+'''
+
 import os.path
 import pkg_resources
 import yaml
@@ -11,12 +22,13 @@ settings_files = ['/etc/xanalytics', '~/.xanalytics']
 
 class _settings(object):
     '''
-    This is a special dictionary-like object which will merge settings from one or more files
-    on disk, and combine them in order. For example, we might have a system-wide set
-    of defaults, a configuration file in `/etc`, a local user override
-    for some settings, a command-line override for others, and even
-    test/debug hotpatches from there. Right now, these files are
-    `/etc/xanalytics` and `~/.xanalytics`. 
+    This is a special dictionary-like object which will merge settings
+    from one or more files on disk, and combine them in order. For
+    example, we might have a system-wide set of defaults, a
+    configuration file in `/etc`, a local user override for some
+    settings, a command-line override for others, and even test/debug
+    hotpatches from there. Right now, these files are
+    `/etc/xanalytics` and `~/.xanalytics`.
 
     Settings overrides can be helpful for things like commandline
     parameters, as well as patching for test cases. The logic for
@@ -37,6 +49,7 @@ class _settings(object):
     {'max-file-size': 5}
     >>> settings['max-file-size'] == initial_max
     True
+
     '''
     _settings = None
 
@@ -44,7 +57,8 @@ class _settings(object):
 
     def refresh(self):
         '''
-        Reload data from the settings files on disk.
+        Reload data from the settings files on disk. These will
+        load and merge these into a common dictionary.
         '''
         self._settings = dict()
         for f in settings_files:

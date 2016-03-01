@@ -2,6 +2,7 @@
 Import CIA World Factbook into an in-memory database.
 
 Also:
+
 * Extract and output country codes for all countries with per-capita GDP
   of less than 3000
 '''

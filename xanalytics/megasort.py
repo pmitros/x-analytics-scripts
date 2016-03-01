@@ -12,6 +12,7 @@ distributed, so it will not scale to very big files.
 
 It's not a bad starting point for a cluster sort like that. The steps
 would be:
+
 * Distribute the initial sort across the cluster
 * Have machines on the cluster do the merge pass for groups of files,
   but merge into several files, with fixed break points
