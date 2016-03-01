@@ -1,6 +1,9 @@
-sentinel
-python-dateutil
+boto
 fs
-pymongo
-pyyaml
 pep8
+pymongo
+python-dateutil
+pyyaml
+sentinel
+sphinx
+sphinx-autobuild

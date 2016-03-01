@@ -11,10 +11,14 @@ settings_files = ['/etc/xanalytics', '~/.xanalytics']
 
 class _settings(object):
     '''
-    This is an object which will read settings from one or more files
-    on disk, and combine them in order. Right now, these files are
-    `/etc/xanalytics` and `~/.xanalytics`. Settings can also be
-    overridden, which is helpful for things like commandline
+    This is a special dictionary-like object which will merge settings from one or more files
+    on disk, and combine them in order. For example, we might have a system-wide set
+    of defaults, a configuration file in `/etc`, a local user override
+    for some settings, a command-line override for others, and even
+    test/debug hotpatches from there. Right now, these files are
+    `/etc/xanalytics` and `~/.xanalytics`. 
+
+    Settings overrides can be helpful for things like commandline
     parameters, as well as patching for test cases. The logic for
     overrides is as follows:
 
@@ -39,6 +43,9 @@ class _settings(object):
     _settings_overrides = []
 
     def refresh(self):
+        '''
+        Reload data from the settings files on disk.
+        '''
         self._settings = dict()
         for f in settings_files:
             f = os.path.expanduser(f)
@@ -50,7 +57,13 @@ class _settings(object):
             if key in override:
                 return override[key]
 
-        return self._settings[key]
+        if key in self._settings:
+            return self._settings[key]
+        else:
+            print "WARNING: Misconfigured missing key", key
+            print "x-analytics-scripts has a config YAML file"
+            print "You should add this key there"
+            return None
 
     def __contains__(self, key):
         for override in self._settings_overrides:

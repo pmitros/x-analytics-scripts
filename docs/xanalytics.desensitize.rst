@@ -1,0 +1,2 @@
+.. automodule:: xanalytics.desensitize
+    :members:

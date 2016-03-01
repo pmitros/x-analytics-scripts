@@ -28,8 +28,14 @@ Making this not one-off would involve:
 * Ideally, some way to combine/organize the output.
 '''
 
-import os
 import datetime
+import os
+import sys
+
+if not os.path.exists('/opt/wwc/replica.sh'):
+    print "This module must be run on a machine with read"
+    print "replica access"
+    sys.exit(-1)
 
 start_time = datetime.datetime.now()
 last_time = start_time

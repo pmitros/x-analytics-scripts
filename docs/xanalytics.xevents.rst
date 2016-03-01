@@ -1,0 +1,2 @@
+.. automodule:: xanalytics.xevents
+    :members:
