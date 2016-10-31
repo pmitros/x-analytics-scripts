@@ -6,6 +6,7 @@ setup(
               'xanalytics.gzipfs',
               'xcluster',
               'xresources',
-              'cmd'],
+              'cmd',
+              'edxhelpers'],
     long_description="Random analytics scripts over edX data."
 )
