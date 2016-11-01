@@ -2,7 +2,7 @@
 This manages the configuration management for the X Analytics
 Scripts. It has several functions:
 
-* Read and merge configuration files ('/etc/xanalytics', '~/.xanalytics')
+* Read and merge configuration files ('/etc/xanalytics.yaml', '~/.xanalytics.yaml')
 * Allow settings to be overridden in specifc settings
 * Abstract away how files are managed into a pyfilesystem object. This
   becomes helpful when moving to S3, or cluster computing, or compressed
@@ -17,7 +17,11 @@ import fs.osfs
 
 from xanalytics.gzipfs import GZIPFS
 
-settings_files = ['/etc/xanalytics', '~/.xanalytics']
+settings_files = [
+    '/etc/xanalytics',
+    '/etc/xanalytics.yaml',
+    '~/.xanalytics',
+    '~/.xanalytics.yaml']
 
 
 class _settings(object):
@@ -28,7 +32,7 @@ class _settings(object):
     configuration file in `/etc`, a local user override for some
     settings, a command-line override for others, and even test/debug
     hotpatches from there. Right now, these files are
-    `/etc/xanalytics` and `~/.xanalytics`.
+    `/etc/xanalytics.yaml` and `~/.xanalytics.yaml`.
 
     Settings overrides can be helpful for things like commandline
     parameters, as well as patching for test cases. The logic for
