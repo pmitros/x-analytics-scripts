@@ -8,15 +8,19 @@ def canonical_course_tuple(course):
     '''
     if course.startswith("course-v1:"):
         course = course[10:].replace('+', '/')
+    if course.startswith("ccx-v1:"):
+        course = course[7:].replace('+', '/')
+        course = course.split('@')[0]
     if course.startswith("i4x://"):
         course = course[6:]
     course = course.split('/')
+    #print course
     course_run = course[2]
     course_run = course_run.replace('Q', 'T').replace("_", "").replace("-", "").replace("B", "")
     if course_run == 'X':
         course_run = "2016" 
     
-    if course_run[1] == 'T':
+    if len(course_run) > 1 and course_run[1] == 'T':
         course_run = course_run.split('T')
         course_run.reverse()
         course_run = 'T'.join(course_run)
