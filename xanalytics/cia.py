@@ -11,7 +11,6 @@ import csv
 import sys
 import sqlite3
 import unicodedata
-import settings
 
 from cia_schema import float_columns, int_columns, dollar_columns, not_nations
 
@@ -52,15 +51,22 @@ def utf_8_encoder(unicode_csv_data):
     for line in unicode_csv_data:
         yield line.encode('utf-8')
 
-public_fs = settings.publicdatafs(compress=False)
+try:
+    import settings
+    public_fs = settings.publicdatafs(compress=False)
+    language_file = public_fs.open("languages.csv")
+    cia_file = public_fs.open("cia-data-all.csv")
+    data = csv.reader(utf_8_encoder(cia_file))
+except:
+    print "Could not use settings/x-analytics-fs. Falling back..."
+    language_file = open("public_data/languages.csv")
+    cia_file = open("public_data/cia-data-all.csv")
+    data = csv.reader(cia_file)
+
 languages = dict(x.split('\t')
                  for x
-                 in public_fs.open("languages.csv"))
-data = csv.reader(
-    utf_8_encoder(
-        settings.publicdatafs(compress=False).open("cia-data-all.csv")
-    )
-)
+                 in language_file)
+
 rownum = 0
 memdata = []
 
